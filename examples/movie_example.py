@@ -35,38 +35,6 @@ test_data -= 1
 # median image for y axis ??
 test_median_y = np.median(test_data, axis=0)
 
-
-## Visualize Image Data -------------------------------------------------------|
-
-# create a figure and image to render our image data
-figure: Figure = plt.figure(figsize=(5,4), dpi=169)
-image: AxesImage = plt.imshow(test_data[0], origin="lower", cmap="copper")
-
-# get handle to the specific subplot to render
-plot_pre = plt.subplot(1, 1, 1)
-
-# set title and limit its x and y resolution
-plot_pre.set_title("Before FLCT Destretching")
-plot_pre.set_xlim(0, 1000)
-plot_pre.set_ylim(0, 1000)
-
-# hide x and y axis numbers since they are pretty much meaningless for images
-plot_pre.set_xticks([])
-plot_pre.set_yticks([])
-
-# define the function to animate each frame
-def draw_frame_original(index: int) -> AxesImage:
-	image.set_data(test_data[index])
-	return image
-
-# create an animation to view the image data in succession
-animation_original = matplotlib.animation.FuncAnimation(
-	figure, draw_frame_original, frames=11, interval=100
-)
-
-# show the visualization
-plt.show()
-
 ## Perform Destretching -------------------------------------------------------|
 
 # I think the sizes of each sub-image to relocate via destretch ??
@@ -92,27 +60,60 @@ r_display: np.ndarray[np.float64]
 destretch_info: destretch.Destretch_params
 (answer, display, r_display, destretch_info) = result
 
-## Visualize new Data ---------------------------------------------------------|
+## Visualize Data -------------------------------------------------------------|
 
-# create the figure and image for rendering the new image data
+# create a figure to render our data onto
 figure: Figure = plt.figure(figsize=(5,4), dpi=169)
-image: AxesImage = plt.imshow(answer[:, :, 0], origin="lower", cmap="copper")
+
+# get handle to the specific subplot to render
+plot_pre = plt.subplot(1, 2, 1)
+plot_pre.set_title("Before FLCT Destretching")
+plot_pre.set_xlim(0, 1000)
+plot_pre.set_ylim(0, 1000)
+
+# hide x and y axis numbers since they are pretty much meaningless for images
+plot_pre.set_xticks([])
+plot_pre.set_yticks([])
+
+# create image for our original image data
+image_original: AxesImage = plt.imshow(
+	test_data[0], origin="lower", cmap="copper"
+)
+
+# define the function to animate each frame
+def draw_frame_original(index: int) -> AxesImage:
+	image_original.set_data(test_data[index])
+	return image_original
+
+# create an animation to view the image data in succession
+animation_original = matplotlib.animation.FuncAnimation(
+	figure, draw_frame_original, frames=11, interval=200
+)
 
 # arrange sublot and get handle
-plot_post = plt.subplot(1, 1, 1)
+plot_post = plt.subplot(1, 2, 2)
 plot_post.set_title("After FLCT Destretching")
 plot_post.set_xlim(0, 1000)
 plot_post.set_ylim(0, 1000)
 
+# hide x and y axis numbers since they are pretty much meaningless for images
+plot_post.set_xticks([])
+plot_post.set_yticks([])
+
+# create the image for rendering the new image data
+image_destretched: AxesImage = plt.imshow(
+	answer[:, :, 0], origin="lower", cmap="copper"
+)
+
+# set the data for each frame of the new 
 def draw_frame_destretched(index: int) -> AxesImage:
-	image.set_data(answer[:, :, index])
-	return image
+	image_destretched.set_data(answer[:, :, index])
+	return image_destretched
 
-
-# create a new animationto display the image data resulting from 
+# create a new animation to display the image data resulting from 
 # the destretching
 animation_destretched = matplotlib.animation.FuncAnimation(
-	figure, draw_frame_destretched, frames=11, interval=100
+	figure, draw_frame_destretched, frames=11, interval=200
 )
 
 # display the visualization
