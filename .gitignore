@@ -1,0 +1,9 @@
+# python intermediary cache 
+__pycache__/
+*.pyc
+
+# post-build distribution package
+dist/
+
+# backup / snapshot file pattern
+*~

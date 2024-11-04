@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flctdestretch"
+version = "0.0.1"
+authors = [
+	{name="Isaiah Smith", email="isaiah.smith@lasp.colorado.edu"},
+]
+description = "Some python FLCT destretching algorithms for heliophysics image processing"
+readme = "README.md"
+requires-python = ">=3.13"
+classifiers = [
+	"Programming Language :: Python :: 3",
+	"License :: OSI Approved :: BSD License",
+	"Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/Technostalgic/flctDestretch/"
+Issues = "https://github.com/Technostalgic/flctDestretch/issues"
