@@ -1,23 +1,27 @@
-## Imports and Initialization ---------------------------------------------------------------------|
+## Imports and Initialization -------------------------------------------------|
 
 import numpy as np
-import astropy.io.fits
 
+# .fits file format parsing
+import astropy.io.fits
+from astropy.io.fits import HDUList, ImageHDU
+
+# data visualization
 import matplotlib.pyplot as plt
 import matplotlib.animation
-
-# internal
-import flctdestretch.destretch as destretch
 
 # plot rendering backend
 matplotlib.use("TkAgg")
 
+# internal
+import flctdestretch.destretch as destretch
 
-## Data Initialization ----------------------------------------------------------------------------|
+
+## Data Initialization --------------------------------------------------------|
 
 # load our image data
-data: astropy.io.fits.HDUList = astropy.io.fits.open("examples/media/test.fits")
-image_data_0: astropy.io.fits.ImageHDU = data[0]
+data: HDUList = astropy.io.fits.open("examples/media/test.fits")
+image_data_0: ImageHDU = data[0]
 
 # test data ?? TODO explain better
 test_data: np.ndarray = image_data_0.data
@@ -30,7 +34,7 @@ test_data -= 1
 test_median_y = np.median(test_data, axis=0)
 
 
-## Visualize Image Data ---------------------------------------------------------------------------|
+## Visualize Image Data -------------------------------------------------------|
 
 # create a figure and image to render our image data
 figure = plt.figure(figsize=(5,4), dpi=169)
@@ -50,7 +54,9 @@ def draw_frame(index: int):
 	return image
 
 # create an animation to view the image data in succession
-animation = matplotlib.animation.FuncAnimation(figure, draw_frame, frames=11, interval=100)
+animation = matplotlib.animation.FuncAnimation(
+	figure, draw_frame, frames=11, interval=100
+)
 
 # hide x and y axis numbers since they are pretty much meaningless for images
 plt.xticks([])
