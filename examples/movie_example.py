@@ -60,6 +60,60 @@ r_display: np.ndarray[np.float64]
 destretch_info: destretch.Destretch_params
 (answer, display, r_display, destretch_info) = result
 
+
+## Visualize Destretch Data ---------------------------------------------------|
+
+r_index: int = 3
+display_delta = (display.T - r_display.T).T
+display_delta_t = np.sqrt(display_delta[0] ** 2 + display_delta[1] ** 2)
+
+plt.figure(figsize=(12,10), facecolor="w")
+
+plt.subplot(2, 2, 1)
+plt.imshow(test_data[r_index], origin="lower", cmap="binary_r")
+plt.title("Raw Scene")
+plt.colorbar()
+plt.xticks([])
+plt.yticks([])
+
+plt.subplot(2, 2, 2)
+plt.imshow(
+	test_data[r_index] - test_median_y, origin="lower", cmap="binary_r", 
+	#vmin=-0.1, vmax=0.1
+)
+plt.title("Raw Difference")
+plt.colorbar()
+plt.xticks([])
+plt.yticks([])
+
+plt.subplot(2, 2, 3)
+plt.imshow(display_delta_t[:, :, r_index], origin="lower", cmap="binary_r")
+plt.title("Destretch Vectors")
+plt.colorbar()
+plt.xticks([])
+plt.yticks([])
+#plt.quiver(
+#	np.arange(destretch_info.cpx)[::2], 
+#	np.arange(destretch_info.cpy)[::2],
+#	display_delta[0, ::2, ::2, r_index],
+#	display_delta[1, ::2, ::2, r_index],
+#	display_delta[::2, ::2, r_index],
+#	cmap="inferno_r"
+#)
+
+plt.subplot(2, 2, 4)
+plt.imshow(
+	answer[:, :, r_index] - test_median_y,
+	origin="lower", cmap="binary_r", 
+	#vmin=-0.01, vmax=0.01
+)
+plt.colorbar()
+plt.xticks([])
+plt.yticks([])
+plt.title("Destretched Difference")
+plt.tight_layout()
+plt.show()
+
 ## Visualize Data -------------------------------------------------------------|
 
 # create a figure to render our data onto
