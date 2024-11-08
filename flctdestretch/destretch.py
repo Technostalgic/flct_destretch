@@ -971,7 +971,7 @@ def destr_control_points(reference, kernel, border_offset, spacing_ratio, mf=0.0
     define_cntl_pts_orig = 0
     
     # TODO review diff (master)
-    destr_info = Destretch_params(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    destr_info = Destretch_params(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
 
     # determine the number of pixels in the kernel
     ksz = kernel.shape

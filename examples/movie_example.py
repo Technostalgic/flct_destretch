@@ -38,10 +38,10 @@ test_median_y = np.median(test_data, axis=0)
 ## Perform Destretching -------------------------------------------------------|
 
 # I think the sizes of each sub-image to relocate via destretch ??
-kernel_sizes: np.array = np.array([32])
+kernel_sizes: np.array = np.array([64])
 
 # ?? TODO
-scene = np.moveaxis(test_data, 0, -1)
+scene = np.moveaxis(test_data.copy(), 0, -1)
 
 # this goes through each image in the data and applies the destretching 
 # algorithm and stores the result
