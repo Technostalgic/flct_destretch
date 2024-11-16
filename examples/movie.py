@@ -1,5 +1,8 @@
 ## Imports and Initialization -------------------------------------------------|
+print("Importing dependencies... ")
 
+from pathlib import Path
+import os
 import numpy as np
 
 # .fits file format parsing
@@ -23,18 +26,23 @@ import flctdestretch.destretch as destretch
 ## Data Initialization --------------------------------------------------------|
 
 # load our image data
-data: HDUList = astropy.io.fits.open("examples/media/test.fits")
+data_filepath: Path = Path(os.getcwd()).joinpath("examples", "media", "test.fits")
+print("Loading test data file '" + str(data_filepath) + "'... ")
+data: HDUList = astropy.io.fits.open(data_filepath)
 image_data_0: ImageHDU = data[0]
+print("Loaded! ")
 
 # test data ?? TODO explain better
 test_data: np.ndarray = image_data_0.data
 
 # process image ??
+print("Preprocessing image data... ")
 test_data /= np.mean(test_data)
 test_data -= 1
 
 # median image for y axis ??
 test_median_y = np.median(test_data, axis=0)
+print("Done! ")
 
 ## Perform Destretching -------------------------------------------------------|
 
@@ -44,6 +52,7 @@ kernel_sizes: np.ndarray[np.int64] = np.array([64])
 # ?? TODO
 scene = np.moveaxis(test_data.copy(), 0, -1)
 
+print("Destretching images... ")
 # this goes through each image in the data and applies the destretching 
 # algorithm and stores the result
 result = destretch.reg_loop_series(
@@ -60,10 +69,12 @@ display: np.ndarray[np.float64]
 r_display: np.ndarray[np.float64]
 destretch_info: destretch.Destretch_params
 (answer, display, r_display, destretch_info) = result
+print("Done!")
 
 
 ## Visualize Destretch Data ---------------------------------------------------|
 
+print("Visualizing data... ")
 r_index: int = 3
 display_delta = (display.T - r_display.T).T
 display_delta_t = np.sqrt(display_delta[0] ** 2 + display_delta[1] ** 2)
@@ -184,3 +195,5 @@ animation_destretched = matplotlib.animation.FuncAnimation(
 
 # display the visualization
 plt.show()
+
+print("Demo Complete")
