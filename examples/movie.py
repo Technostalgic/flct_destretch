@@ -13,7 +13,8 @@ from matplotlib.figure import Figure
 from matplotlib.image import AxesImage
 
 # plot rendering backend
-matplotlib.use("TkAgg")
+matplotlib.use("tkagg")
+plt.rcParams['toolbar'] = 'None'
 
 # internal
 import flctdestretch.destretch as destretch
@@ -38,7 +39,7 @@ test_median_y = np.median(test_data, axis=0)
 ## Perform Destretching -------------------------------------------------------|
 
 # I think the sizes of each sub-image to relocate via destretch ??
-kernel_sizes: np.array = np.array([64])
+kernel_sizes: np.ndarray[np.int64] = np.array([64])
 
 # ?? TODO
 scene = np.moveaxis(test_data.copy(), 0, -1)
@@ -129,19 +130,23 @@ plot_pre.set_ylim(0, 1000)
 plot_pre.set_xticks([])
 plot_pre.set_yticks([])
 
-# create image for our original image data
-image_original: AxesImage = plt.imshow(
+# create image sequences for our original image data
+frame_original: AxesImage = plt.imshow(
 	test_data[0], origin="lower", cmap="copper"
 )
+frame_original.set_rasterized(True)
+frame_original.set_animated(True)
 
 # define the function to animate each frame
 def draw_frame_original(index: int) -> AxesImage:
-	image_original.set_data(test_data[index])
-	return image_original
+	frame_original.set_data(test_data[index])
+	return frame_original
 
 # create an animation to view the image data in succession
 animation_original = matplotlib.animation.FuncAnimation(
-	figure, draw_frame_original, frames=11, interval=200
+	figure, draw_frame_original, 
+	frames=len(test_data), 
+	interval=100
 )
 
 # arrange sublot and get handle
@@ -154,20 +159,27 @@ plot_post.set_ylim(0, 1000)
 plot_post.set_xticks([])
 plot_post.set_yticks([])
 
-# create the image for rendering the new image data
-image_destretched: AxesImage = plt.imshow(
+# create the images for rendering the new destretched image data
+frame_destretched = plt.imshow(
 	answer[:, :, 0], origin="lower", cmap="copper"
 )
+frame_destretched.set_rasterized(True)
+frame_destretched.set_animated(True)
+images_sequence_destretched: np.ndarray[AxesImage] = np.empty(11, dtype=AxesImage)
+for i in range(len(images_sequence_destretched)):
+	images_sequence_destretched[i] = answer[:, :, i].copy()
 
 # set the data for each frame of the new 
 def draw_frame_destretched(index: int) -> AxesImage:
-	image_destretched.set_data(answer[:, :, index])
-	return image_destretched
+	frame_destretched.set_data(images_sequence_destretched[index])
+	return frame_destretched
 
 # create a new animation to display the image data resulting from 
 # the destretching
 animation_destretched = matplotlib.animation.FuncAnimation(
-	figure, draw_frame_destretched, frames=11, interval=200
+	figure, draw_frame_destretched, 
+	frames=len(images_sequence_destretched), 
+	interval=100
 )
 
 # display the visualization
