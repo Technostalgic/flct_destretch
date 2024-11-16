@@ -1,8 +1,8 @@
 """
 Created on Tue Oct 13 16:09:55 2020
 
-NOTE: DEPRICATED - Destretching routines for removing optical defects following the
-reg.pro by Phil Wiborg and Thomas Rimmele in reg.pro
+NOTE: DEPRICATED - Destretching routines for removing optical defects following 
+the reg.pro by Phil Wiborg and Thomas Rimmele in reg.pro
 
 @author: molnarad
 """
