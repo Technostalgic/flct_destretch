@@ -44,6 +44,7 @@ test_data -= 1
 test_median_y = np.median(test_data, axis=0)
 print("Done! ")
 
+
 ## Perform Destretching -------------------------------------------------------|
 
 # I think the sizes of each sub-image to relocate via destretch ??
@@ -125,6 +126,7 @@ plt.yticks([])
 plt.title("Destretched Difference")
 plt.tight_layout()
 plt.show()
+
 
 ## Visualize Data -------------------------------------------------------------|
 
