@@ -12,7 +12,10 @@ from scipy import signal as signal
 
 ## Implementation -------------------------------------------------------------|
 
-def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor = False):
+def bilin_values_scene(
+    scene, coords_new, destr_info, 
+    nearest_neighbor = False
+):
     """
     Bilinear interpolation (resampling)
     of the scene s at coordinates xy
@@ -64,8 +67,11 @@ def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor = False):
 
         ss00 = scene_float[x0, y0]
         ss01 = scene_float[x0, y1]
-        ssfx00 =                (scene_float[x1, y0] - ss00) * fx
-        ssfy01 = (ss01 - ss00 + (scene_float[x1, y1] - ss01) * fx - ssfx00) * fy
+        ssfx00 = (scene_float[x1, y0] - ss00) * fx
+        ssfy01 = (
+            ss01 - ss00 + (scene_float[x1, y1] - ss01) * fx - ssfx00
+        ) * fy
+        
         scene_interp  = ss00 + ssfx00 + ssfy01
 
     return scene_interp
@@ -181,12 +187,30 @@ def crosscor_maxpos(cc, order=1):
             xmax=xfra
             ymax=yfra
         elif order == 2:
-            a2 = (cc[xmax+1, ymax] - cc[xmax-1, ymax])/2.
-            a3 = (cc[xmax+1, ymax]/2. - cc[xmax, ymax] + cc[xmax-1, ymax]/2.)
-            a4 = (cc[xmax, ymax+1] - cc[xmax, ymax-1])/2.
-            a5 = (cc[xmax, ymax+1]/2. - cc[xmax, ymax] + cc[xmax, ymax-1]/2.)
-            a6 = (cc[xmax+1, ymax+1] - cc[xmax+1, ymax-1] 
-                - cc[xmax-1, ymax+1] + cc[xmax-1, ymax-1])/4.
+            a2 = (
+                cc[xmax+1, ymax] - 
+                cc[xmax-1, ymax]
+            ) / 2.
+            a3 = (
+                cc[xmax+1, ymax]/2. - 
+                cc[xmax, ymax] + 
+                cc[xmax-1, ymax]/2.
+            )
+            a4 = (
+                cc[xmax, ymax+1] - 
+                cc[xmax, ymax-1]
+            ) / 2.
+            a5 = (
+                cc[xmax, ymax+1]/2. - 
+                cc[xmax, ymax] + 
+                cc[xmax, ymax-1]/2.
+            )
+            a6 = (
+                cc[xmax+1, ymax+1] - 
+                cc[xmax+1, ymax-1] - 
+                cc[xmax-1, ymax+1] + 
+                cc[xmax-1, ymax-1]
+            ) / 4.
             xdif = (2*a2*a5 - a4*a6) / (a6**2 - 4*a3*a5)
             ydif = (2*a3*a4 - a2*a6) / (a6**2 - 4*a3*a5)
             xmax = xmax + xdif
@@ -221,7 +245,11 @@ def surface_fit(points_array, order=0):
         L, M = points_array.shape
         X1, X2 = np.mgrid[:L, :M]
         # reshape independent variables into form [a, b*X1, c*X2]
-        X = np.hstack((np.ones((L*M, 1)), X1.reshape((L*M, 1)), X2.reshape((L*M, 1))))
+        X = np.hstack((
+            np.ones((L*M, 1)), 
+            X1.reshape((L*M, 1)), 
+            X2.reshape((L*M, 1))
+        ))
         # reshape dependent variable into column vector
         YY = points_array.reshape((L*M, 1))
         # calculate normal vector of plane: theta = [X.T X]^-1 X.T YY

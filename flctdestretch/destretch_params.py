@@ -44,7 +44,7 @@ class DestretchParams():
     debug : Any
         TODO
     """
-    def __init__(self, 
+    def __init__(self,
             kx: int = 0, ky: int = 0, 
             wx: int = 0, wy: int = 0, 
             bx: int = 0, by: int = 0, 
