@@ -20,3 +20,8 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/Technostalgic/flctDestretch/"
 Issues = "https://github.com/Technostalgic/flctDestretch/issues"
+
+[tool.hatch.build]
+exclude = [
+	"/flctdestretch/examples"
+]
