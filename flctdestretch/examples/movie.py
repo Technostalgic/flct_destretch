@@ -20,7 +20,8 @@ matplotlib.use("tkagg")
 plt.rcParams['toolbar'] = 'None'
 
 # internal
-import flctdestretch.destretch as destretch
+from algorithm import reg_loop_series
+from destretch_params import DestretchParams
 
 
 ## Data Initialization --------------------------------------------------------|
@@ -56,7 +57,7 @@ scene = np.moveaxis(test_data.copy(), 0, -1)
 print("Destretching images... ")
 # this goes through each image in the data and applies the destretching 
 # algorithm and stores the result
-result = destretch.reg_loop_series(
+result = reg_loop_series(
 	scene, 
 	test_median_y, 
 	kernel_sizes, 
@@ -68,7 +69,7 @@ result = destretch.reg_loop_series(
 answer: np.ndarray[np.float64]
 display: np.ndarray[np.float64]
 r_display: np.ndarray[np.float64]
-destretch_info: destretch.Destretch_params
+destretch_info: DestretchParams
 (answer, display, r_display, destretch_info) = result
 print("Done!")
 
