@@ -67,11 +67,12 @@ def bilin_values_scene(
 
         ss00 = scene_float[x0, y0]
         ss01 = scene_float[x0, y1]
+        
         ssfx00 = (scene_float[x1, y0] - ss00) * fx
         ssfy01 = (
             ss01 - ss00 + (scene_float[x1, y1] - ss01) * fx - ssfx00
         ) * fy
-        
+
         scene_interp  = ss00 + ssfx00 + ssfy01
 
     return scene_interp

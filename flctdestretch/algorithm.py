@@ -227,7 +227,8 @@ def destr_control_points(
         destr_info.spacing_x += destr_info.spacing_x % 2
         destr_info.spacing_y += destr_info.spacing_y % 2
 
-        # divide the number of allowable pixels by the control points, round down to nearest integer
+        # divide the number of allowable pixels by the control points, round 
+        # down to nearest integer
         num_grid_x = int(allowable_range_x / destr_info.spacing_x) + 1
         num_grid_y = int(allowable_range_y / destr_info.spacing_y) + 1
         destr_info.cpx = num_grid_x
@@ -236,8 +237,8 @@ def destr_control_points(
         # how far apart will the first and last control points be, in each axis
         total_range_x = destr_info.spacing_x * (num_grid_x - 1)
         total_range_y = destr_info.spacing_y * (num_grid_y - 1)
-        # the total range will be less than the maximum possible range, in most cases
-        # so allocate some of those extra pixels to each border
+        # the total range will be less than the maximum possible range, in 
+        # most cases so allocate some of those extra pixels to each border
         destr_info.bx = np.round((
             allowable_range_x - 
             total_range_x + 
