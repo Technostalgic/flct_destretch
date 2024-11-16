@@ -1,7 +1,7 @@
 """
 Created on Tue Oct 13 16:09:55 2020
 
-Destretching routines for removing optical defects following the
+NOTE: DEPRICATED - Destretching routines for removing optical defects following the
 reg.pro by Phil Wiborg and Thomas Rimmele in reg.pro
 
 @author: molnarad
@@ -9,7 +9,6 @@ reg.pro by Phil Wiborg and Thomas Rimmele in reg.pro
 
 import numpy as np
 from scipy import signal as signal
-from scipy.interpolate import RectBivariateSpline
 import matplotlib.pyplot as plt
 from time import time
 
