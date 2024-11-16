@@ -1,5 +1,6 @@
 """
-TODO
+Utility processing module for suplementing flct destretching algorithms based 
+on implementation by Momchil Molnar
 """
 
 

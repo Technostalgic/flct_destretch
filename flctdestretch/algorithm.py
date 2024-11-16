@@ -1,5 +1,6 @@
 """
-TODO
+Primary algorithm module to perform flct destretching image processing based 
+on implementation by Momchil Molnar
 """
 
 
