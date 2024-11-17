@@ -7,7 +7,7 @@ on implementation by Momchil Molnar
 ## Imports and Initialization -------------------------------------------------|
 
 import numpy as np
-#from scipy import signal as signal
+from scipy import signal as signal
 
 
 ## Implementation -------------------------------------------------------------|
@@ -99,8 +99,8 @@ def apod_mask(nx, ny, fraction=0.08):
     taper_wx = int(nx * min(fraction, 0.5))
     taper_wy = int(ny * min(fraction, 0.5))
 
-    #filt_x = signal.windows.blackman(2 * taper_wx)
-    #filt_y = signal.windows.blackman(2 * taper_wy)
+    filt_x = signal.windows.blackman(2 * taper_wx)
+    filt_y = signal.windows.blackman(2 * taper_wy)
 
     left = np.zeros(taper_wx) # filt_x[:taper_wx]
     right = left[::-1]
