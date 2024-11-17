@@ -51,7 +51,7 @@ print("Done! ")
 kernel_sizes: np.ndarray[np.int64] = np.array([64])
 
 # ?? TODO
-scene = np.moveaxis(test_data.copy(), 0, -1)
+scene = np.moveaxis(test_data, 0, -1)
 
 print("Destretching images... ")
 # this goes through each image in the data and applies the destretching 

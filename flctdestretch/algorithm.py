@@ -348,7 +348,8 @@ def controlpoint_offsets_fft(
             scene_subarr = scene[
                 sub_strt_x:sub_end_x+1, 
                 sub_strt_y:sub_end_y+1
-            ]
+            ].copy() 
+            # .copy() is BUGFIX for brightness artifacts appearing on end result
 
             scene_subarr -= processing.surface_fit(
                 scene_subarr, 
