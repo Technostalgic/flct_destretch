@@ -766,7 +766,8 @@ def doref(ref_image, apod_mask, destr_info):
             ref_subarr = ref_image[
                 sub_strt_x :
                 (sub_end_x+1), sub_strt_y:(sub_end_y+1)
-            ]
+            ].copy()
+            # BUGFIX for darkness artifacts
             
             ref_subarr -= processing.surface_fit(
                 ref_subarr, 
