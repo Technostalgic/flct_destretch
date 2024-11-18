@@ -491,6 +491,9 @@ def controlpoint_offsets_adf(
 
 ## Reg ------------------------------------------------------------------------|
 
+def reg_loop_files():
+    return
+
 def reg_loop_series(
         scene, ref, kernel_sizes, mf=0.08, 
         use_fft=False, adf2_pad=0.25, border_offset=4, spacing_ratio=0.5
