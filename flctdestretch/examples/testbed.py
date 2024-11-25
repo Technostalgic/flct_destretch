@@ -60,7 +60,7 @@ test_data /= np.mean(test_data)
 test_data -= 1
 
 # median image for y axis ??
-test_median_y = np.median(test_data, axis=0)
+test_median_y = np.median(test_data, axis=2)
 print("Done! ")
 
 
@@ -70,9 +70,7 @@ print("Done! ")
 kernel_sizes: np.ndarray[np.int64] = np.array([256])
 
 # ?? TODO
-print(test_data.shape)
-scene = np.moveaxis(test_data, 0, -1)
-print(scene.shape)
+scene = np.moveaxis(test_data, 0, 0)
 
 print("Destretching images... ")
 # this goes through each image in the data and applies the destretching 
@@ -104,7 +102,7 @@ display_delta_t = np.sqrt(display_delta[0] ** 2 + display_delta[1] ** 2)
 plt.figure(figsize=(12,10), facecolor="w")
 
 plt.subplot(2, 2, 1)
-plt.imshow(test_data[r_index], origin="lower", cmap="binary_r")
+plt.imshow(test_data[:,:,r_index], origin="lower", cmap="binary_r")
 plt.title("Raw Scene")
 plt.colorbar()
 plt.xticks([])
@@ -112,7 +110,7 @@ plt.yticks([])
 
 plt.subplot(2, 2, 2)
 plt.imshow(
-	test_data[r_index] - test_median_y, origin="lower", cmap="binary_r", 
+	test_data[:,:,r_index] - test_median_y, origin="lower", cmap="binary_r", 
 	#vmin=-0.1, vmax=0.1
 )
 plt.title("Raw Difference")
@@ -157,8 +155,8 @@ figure: Figure = plt.figure(figsize=(5,4), dpi=169)
 # get handle to the specific subplot to render
 plot_pre = plt.subplot(1, 2, 1)
 plot_pre.set_title("Before FLCT Destretching")
-plot_pre.set_xlim(0, 1000)
-plot_pre.set_ylim(0, 1000)
+#plot_pre.set_xlim(0, 1000)
+#plot_pre.set_ylim(0, 1000)
 
 # hide x and y axis numbers since they are pretty much meaningless for images
 plot_pre.set_xticks([])
@@ -166,28 +164,28 @@ plot_pre.set_yticks([])
 
 # create image sequences for our original image data
 frame_original: AxesImage = plt.imshow(
-	test_data[0], origin="lower", cmap="copper"
+	test_data[:,:,0], origin="lower", cmap="copper"
 )
 frame_original.set_rasterized(True)
 frame_original.set_animated(True)
 
 # define the function to animate each frame
 def draw_frame_original(index: int) -> AxesImage:
-	frame_original.set_data(test_data[index])
+	frame_original.set_data(test_data[:,:,index])
 	return frame_original
 
 # create an animation to view the image data in succession
 animation_original = matplotlib.animation.FuncAnimation(
 	figure, draw_frame_original, 
-	frames=len(test_data), 
+	frames=test_data.shape[2], 
 	interval=100
 )
 
 # arrange sublot and get handle
 plot_post = plt.subplot(1, 2, 2)
 plot_post.set_title("After FLCT Destretching")
-plot_post.set_xlim(0, 1000)
-plot_post.set_ylim(0, 1000)
+#plot_post.set_xlim(0, 1000)
+#plot_post.set_ylim(0, 1000)
 
 # hide x and y axis numbers since they are pretty much meaningless for images
 plot_post.set_xticks([])
