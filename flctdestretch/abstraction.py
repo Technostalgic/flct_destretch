@@ -13,13 +13,10 @@ def destretch_files(filepaths: list[str], kernel_sizes: list[int]) -> tuple[
 	DestretchParams
 ]:
 	"""
-    Compute the coordinates of the pixels in the output images to be
-    sampled from the input image (using Scipy.interpolate.RectBivariate).
-    Interpolate the control point displacements to infer the sampling
-    coordinates.
+	Compute the destretched result of data from all given files
 
-    Parameters
-    ----------
+	Parameters
+	----------
     filepaths : list[str]
         list of files in order to treat as image sequence for destretching
     kernel_sizes : ndarray (kx, ky, 2)
