@@ -296,12 +296,9 @@ def destr_control_points(
     return destr_info, rcps
 
 def controlpoint_offsets_fft(
-    scene, subfield_fftconj, apod_mask, 
-    lowpass_filter, destr_info
-):
-    # TODO: check that this works, is called from reg
-    # TODO: make plane_subtraction option work
-    #def cploc(s, w, apod_mask, smou, d_info, adf2_pad=0.25):
+        scene, subfield_fftconj, apod_mask, 
+        lowpass_filter, destr_info
+    ):
     """
     Locate control points
 
@@ -310,8 +307,7 @@ def controlpoint_offsets_fft(
     scene : array
         a 2-dimensional array (L x M) containing the image to be registered
     subfield_fftconj : array
-        the array of FFTs of all the image subfields, as cutout from the 
-        reference array
+        the array of FFTs of all the image subfields, as cutout from the reference array
     apod_mask : array
         apodization mask, darkens edges of images to reduce FFT artifacts
     lowpass_filter : array
@@ -325,63 +321,42 @@ def controlpoint_offsets_fft(
         X and Y offsets for control points
 
     """
-    subfield_offsets = np.zeros(
-        (2, destr_info.cpx, destr_info.cpy), 
-        order="F"
-    )
+    subfield_offsets = np.zeros((2, destr_info.cpx, destr_info.cpy), order="F")
 
     # number of array elements in each subfield
     nels = destr_info.kx * destr_info.ky
+
+    print("corrected code")
 
     for j in range(0, destr_info.cpy):
  
         for i in range(0, destr_info.cpx):
 
-            sub_strt_x = int(destr_info.rcps[0,i,j] - destr_info.kx/2)
-            sub_end_x = int(sub_strt_x + destr_info.kx - 1)
+            sub_strt_x  = int(destr_info.rcps[0,i,j] - destr_info.kx/2)
+            sub_end_x   = int(sub_strt_x + destr_info.kx - 1)
 
-            sub_strt_y = int(destr_info.rcps[1,i,j] - destr_info.ky/2)
-            sub_end_y = int(sub_strt_y + destr_info.ky - 1)
+            sub_strt_y  = int(destr_info.rcps[1,i,j] - destr_info.ky/2)
+            sub_end_y   = int(sub_strt_y + destr_info.ky - 1)
 
             #cross correlation, inline
             #ss = s[lx:hx, ly:hy]
-            scene_subarr = scene[
-                sub_strt_x:sub_end_x+1, 
-                sub_strt_y:sub_end_y+1
-            ].copy() 
-            # .copy() is BUGFIX for brightness artifacts appearing on end result
+            scene_subarr = scene[sub_strt_x:sub_end_x+1, sub_strt_y:sub_end_y+1].copy()
 
-            scene_subarr -= processing.surface_fit(
-                scene_subarr, 
-                destr_info.subfield_correction
-            )
+            scene_subarr -= processing.surface_fit(scene_subarr, destr_info.subfield_correction)
 
             #ss = (ss - np.polyfit(ss[0, :], ss[1 1))*mask
-            scene_subarr_fft = np.array(
-                np.fft.fft2(scene_subarr), 
-                order="F"
-            )
-            scene_subarr_fft = (
-                scene_subarr_fft * 
-                subfield_fftconj[:, :, i, j] * 
-                lowpass_filter
-            )
+            scene_subarr_fft = np.array(np.fft.fft2(scene_subarr), order="F")
+            scene_subarr_fft = scene_subarr_fft  * subfield_fftconj[:, :, i, j] * lowpass_filter
         
-            scene_subarr_ifft = np.abs(
-                np.fft.ifft2(scene_subarr_fft), 
-                order="F"
-            )
-            cc = np.roll(
-                scene_subarr_ifft, 
-                (int(destr_info.kx/2), int(destr_info.ky/2)), 
-                axis=(0, 1)
-            )
+            scene_subarr_ifft = np.abs(np.fft.ifft2(scene_subarr_fft), order="F")
+            cc = np.roll(scene_subarr_ifft, (int(destr_info.kx/2), int(destr_info.ky/2)),
+                            axis=(0, 1))
             #cc = np.fft.fftshift(scene_subarr_ifft)
             cc = np.array(cc, order="F")
 
-            xmax, ymax = processing.crosscor_maxpos(
-                cc, destr_info.max_fit_method
-            )
+            #print("Crosscorrelation Maxpos Order: ", destr_info.max_fit_method)
+
+            xmax, ymax = processing.crosscor_maxpos(cc, destr_info.max_fit_method)
 
             subfield_offsets[0,i,j] = sub_strt_x + xmax
             subfield_offsets[1,i,j] = sub_strt_y + ymax
@@ -491,8 +466,65 @@ def controlpoint_offsets_adf(
 
 ## Reg ------------------------------------------------------------------------|
 
-def reg_loop_files():
-    return
+def reg_loop(scene, ref, kernel_sizes, mf=0.08, use_fft=True, adf2_pad=0.25, adf_pow=2, border_offset=4, spacing_ratio=0.5):
+    """
+    Parameters
+    ----------
+    scene : ndarray (nx, ny)
+        Image to be destretched
+    ref : ndarray (nx, ny)
+        Reference image
+    kernel_sizes : ndarray (n_kernels)
+        Sizes of the consecutive kernels to be applied
+
+    Returns
+    -------
+    ans : ndarray (nx, ny)
+        Destretched scene
+    destr_info: Destretch class
+        Parameters of the destretching
+    """
+
+    scene_nx = scene.shape[0]
+    scene_ny = scene.shape[1]
+
+    scene_temp = scene.copy()
+    start = time.time()
+    print("Spacing Ratio: ", spacing_ratio)
+
+    disp_sum     = np.zeros((2,scene_nx, scene_ny))
+    offsets_sum  = np.zeros((2,scene_nx, scene_ny))
+    rdisp_sum    = np.zeros((2,scene_nx, scene_ny))
+    kernel_count = 0.0
+
+    for kernel_dim in kernel_sizes:
+        scene_temp, disp, rdisp, destr_info = reg(
+            scene_temp, ref, 
+            kernel_dim, mf, 
+            use_fft, adf2_pad, 
+            adf_pow, border_offset, 
+            spacing_ratio
+        )
+        # remap displacements onto spatial grid of scene 
+        # (i.e. the same number of pixels as the input image)
+        dispmap_new, offsets_new  = bilin_control_points(scene, rdisp, disp)
+        # add the displacement and offset maps to
+        disp_sum     += dispmap_new
+        offsets_sum  += offsets_new
+        rdisp_sum    += dispmap_new - offsets_new
+        kernel_count += 1
+
+    # the displacement maps contain the pixel reference coordinates, so 
+    # adding them iteratively sums those reference coordinates
+    # divide by the number of maps summed to get back to the rate coordinates
+    disp_sum /= kernel_count
+    rdisp_sum /= kernel_count
+
+    end = time()
+    print(f"Total elapsed time {(end - start):.4f} seconds.")
+    ans = scene_temp
+
+    return ans, disp_sum, rdisp_sum, destr_info
 
 def reg_loop_series(
         scene, ref, kernel_sizes, mf=0.08, 
@@ -798,7 +830,7 @@ def reg_saved_window(
         mm, smou, use_fft=False, adf2_pad=0.25
     ):
     """
-    Register scenes with respect to ref using kernel size and
+    Register scenes with respect to reference image using kernel size and
     then returns the destretched scene, using precomputed window.
 
     Parameters

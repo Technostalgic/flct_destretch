@@ -64,6 +64,8 @@ def destretch_files(filepaths: list[str], kernel_sizes: list[int]) -> tuple[
 		image_resolution[1], 
 		len(data_sequence)
 	))
+	for i in range(len(data_sequence)):
+		data_cube[:, :, i] = data_sequence[i]
 
 	# median of each pixel over the image sequence
 	test_median_image = np.median(data_cube, axis=2)
