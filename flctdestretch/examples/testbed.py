@@ -9,8 +9,17 @@ import abstraction
 #     files[i] = os.path.join(dir, files[i])
 # files = files[1:-1]
 files = [
-	os.path.join(".", "examples", "media", "test_00.fits"),
-	os.path.join(".", "examples", "media", "test_01.fits"),
+	os.path.join(".", "examples", "media", "test_1k_00.fits"),
+	os.path.join(".", "examples", "media", "test_1k_01.fits"),
+	os.path.join(".", "examples", "media", "test_1k_02.fits"),
+	os.path.join(".", "examples", "media", "test_1k_03.fits"),
+	os.path.join(".", "examples", "media", "test_1k_04.fits"),
+	os.path.join(".", "examples", "media", "test_1k_05.fits"),
+	os.path.join(".", "examples", "media", "test_1k_06.fits"),
+	os.path.join(".", "examples", "media", "test_1k_07.fits"),
+	os.path.join(".", "examples", "media", "test_1k_08.fits"),
+	os.path.join(".", "examples", "media", "test_1k_09.fits"),
+	os.path.join(".", "examples", "media", "test_1k_10.fits"),
 ]
 print(files)
 
@@ -20,7 +29,7 @@ for file in files:
     data = fits.open(file)
     datas.append(data)
 
-data_cube = np.zeros((4096, 4096, 11))
+data_cube = np.zeros((1000, 1000, 11))
 i = 0
 for data in datas:
     for compdata in data:
@@ -73,12 +82,12 @@ test_median_y = np.median(test_data, axis=2)
 ## Perform Destretching -------------------------------------------------------|
 
 ## I think the sizes of each sub-image to relocate via destretch ??
-kernel_sizes: np.ndarray[np.int64] = np.array([256])
+kernel_sizes: np.ndarray[np.int64] = np.array([64, 32])
 
 ## ?? TODO
 scene = np.moveaxis(test_data, 0, 0)
 
-#print("Destretching images... ")
+print("Destretching images... ")
 # this goes through each image in the data and applies the destretching 
 # algorithm and stores the result
 # result = destretch.reg_loop_series(
@@ -89,7 +98,11 @@ scene = np.moveaxis(test_data, 0, 0)
 # 	use_fft=True 
 # )
 
-result = abstraction.destretch_files(files, kernel_sizes)
+result = abstraction.destretch_files(
+	files, 
+    kernel_sizes, 
+    abstraction.IndexSchema.XY
+)
 
 # # deconstruct the results into meaningful typed variables
 # answer: np.ndarray[np.float64]
