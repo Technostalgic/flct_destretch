@@ -6,11 +6,8 @@ from algorithm import reg_loop, reg_loop_series
 from destretch_params import DestretchParams
 
 
-def destretch_files(filepaths: list[str], kernel_sizes: list[int]) -> tuple[
-	np.ndarray[np.float64],
-	np.ndarray[np.float64],
-	np.ndarray[np.float64],
-	DestretchParams
+def destretch_files(filepaths: list[str], kernel_sizes: list[int]) -> list[
+	np.ndarray
 ]:
 	"""
 	Compute the destretched result of data from all given files
