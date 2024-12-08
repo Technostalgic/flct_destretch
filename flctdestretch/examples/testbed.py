@@ -1,6 +1,6 @@
 import numpy as np
 import astropy.io.fits as fits
-import os
+import os.path
 import abstraction
 
 # dir = ".\\examples\\media"
@@ -9,10 +9,11 @@ import abstraction
 #     files[i] = os.path.join(dir, files[i])
 # files = files[1:-1]
 files = [
-    ".\\examples\\media\\test_00.fits",
-    ".\\examples\\media\\test_01.fits",
+	os.path.join(".", "examples", "media", "test_00.fits"),
+	os.path.join(".", "examples", "media", "test_01.fits"),
 ]
 print(files)
+
 
 datas: list[fits.HDUList] = []
 for file in files:
