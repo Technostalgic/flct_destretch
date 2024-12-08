@@ -12,10 +12,7 @@ from scipy import signal as signal
 
 ## Implementation -------------------------------------------------------------|
 
-def bilin_values_scene(
-    scene, coords_new, destr_info, 
-    nearest_neighbor = False
-):
+def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor=False):
     """
     Bilinear interpolation (resampling)
     of the scene s at coordinates xy
@@ -34,13 +31,17 @@ def bilin_values_scene(
     -------
     ans: ndarray (nx, ny)
         Bilinear interpolated (resampled) image at the xy locations
+
     """
 
     if nearest_neighbor == True:
-        x = np.array(coords_new[:, :, 0] + .5, order="F")
-        y = np.array(coords_new[:, :, 1] + .5, order="F")
+        x = np.array(np.round(coords_new[0, :, :]), order="F", dtype=int)
+        y = np.array(np.round(coords_new[1, :, :]), order="F", dtype=int)
         
-        scene_interp = scene[x, y]
+        scene_interp = scene[
+            np.clip(x,0,x.shape[0]-1), 
+            np.clip(y,0,y.shape[1]-1)
+        ]
 
     else:
         x = np.array(coords_new[0, :, :], order="F")
@@ -67,12 +68,8 @@ def bilin_values_scene(
 
         ss00 = scene_float[x0, y0]
         ss01 = scene_float[x0, y1]
-        
         ssfx00 = (scene_float[x1, y0] - ss00) * fx
-        ssfy01 = (
-            ss01 - ss00 + (scene_float[x1, y1] - ss01) * fx - ssfx00
-        ) * fy
-
+        ssfy01 = (ss01 - ss00 + (scene_float[x1, y1] - ss01) * fx - ssfx00) * fy
         scene_interp  = ss00 + ssfx00 + ssfy01
 
     return scene_interp
