@@ -2,7 +2,7 @@ import numpy as np
 import astropy.io.fits as fits
 from astropy.io.fits.hdu import HDUList, ImageHDU, CompImageHDU
 
-from algorithm import reg_loop_series
+from algorithm import reg_loop, reg_loop_series
 from destretch_params import DestretchParams
 
 
@@ -29,10 +29,13 @@ def destretch_files(filepaths: list[str], kernel_sizes: list[int]) -> tuple[
 	"""
 
 	# used to enforce the same resolution for all data files
-	image_resolution = [-1,-1]
+	image_resolution = (-1,-1)
 
-	# stores the image hdu data from all files
-	data_sequence: list[np.ndarray] = []
+	# store the results
+	result_sequence: list[np.ndarray] = []
+
+	# reference image to feed into next destretch loop
+	reference_image: np.ndarray | None = None
 
 	# read each image HDU in each file
 	print("Searching for image data in specified files...")
@@ -48,33 +51,52 @@ def destretch_files(filepaths: list[str], kernel_sizes: list[int]) -> tuple[
 
 					# ensure all data matches the first file's resolution
 					if image_resolution[0] < 0:
-						image_resolution[0] = image_data.shape[2]
-						image_resolution[1] = image_data.shape[1]
+						image_resolution = (
+							image_data.shape[2], 
+							image_data.shape[1]
+						)
 					elif (
 						image_resolution[0] != image_data.shape[2] or 
 						image_resolution[1] != image_data.shape[1]
 					): continue
 
+					# TODO seperate image data by z axis
+					image_data = np.moveaxis(image_data, 0, -1)[:,:,0]
+
+					# debug log
 					print(f"found {hdu_index} in {path}: {image_data.shape}")
-					data_sequence.append(image_data)
-	print(f"found {len(data_sequence)} image data units")
 
-	data_cube: np.ndarray = np.zeros((
-		image_resolution[0], 
-		image_resolution[1], 
-		len(data_sequence)
-	))
-	for i in range(len(data_sequence)):
-		data_cube[:, :, i] = data_sequence[i]
+					# if no previous image, use self for reference and result 
+					# image, do not process
+					if reference_image is None:
+						reference_image = image_data
+						result_sequence.append(image_data)
+						print("initial image to be used as reference")
+						continue
 
-	# median of each pixel over the image sequence
-	test_median_image = np.median(data_cube, axis=2)
+					image_num = len(result_sequence) + 1
+					print(f"processing image #{image_num}..")
 
-	print("applying destretching now...")
-	return reg_loop_series(
-		data_cube, 
-		test_median_image, 
-		kernel_sizes,
-		mf=0.08,
-		use_fft=True
-	)
+					# perform image destretching
+					result = reg_loop(
+						image_data, 
+						reference_image, 
+						kernel_sizes,
+						mf=0.08,
+						use_fft=True
+					)
+
+					# decompose result
+					answer: np.ndarray
+					destretch_info: DestretchParams
+					answer, _, _, destretch_info = result
+
+					# save the processed image in the results array
+					result_sequence.append(answer)
+					print(f"processed image #{image_num}")
+
+					# store previously processed frame as reference image to use
+					# for nex image in series
+					reference_image = result_sequence[-1]
+
+	return result_sequence

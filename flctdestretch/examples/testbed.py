@@ -91,68 +91,73 @@ scene = np.moveaxis(test_data, 0, 0)
 
 result = abstraction.destretch_files(files, kernel_sizes)
 
-# deconstruct the results into meaningful typed variables
-answer: np.ndarray[np.float64]
-display: np.ndarray[np.float64]
-r_display: np.ndarray[np.float64]
-destretch_info: destretch.DestretchParams
-(answer, display, r_display, destretch_info) = result
+# # deconstruct the results into meaningful typed variables
+# answer: np.ndarray[np.float64]
+# display: np.ndarray[np.float64]
+# r_display: np.ndarray[np.float64]
+# destretch_info: destretch.DestretchParams
+# (	
+#     answer, 
+#  	# display, 
+#     # r_display, 
+#     destretch_info
+# ) = result
 print("Done!")
 
 
 ## Visualize Destretch Data ---------------------------------------------------|
 
 print("Visualizing data... ")
-r_index: int = 1
-display_delta = (display.T - r_display.T).T
-display_delta_t = np.sqrt(display_delta[0] ** 2 + display_delta[1] ** 2)
-
-plt.figure(figsize=(12,10), facecolor="w")
-
-plt.subplot(2, 2, 1)
-plt.imshow(test_data[:,:,r_index], origin="lower", cmap="binary_r")
-plt.title("Raw Scene")
-plt.colorbar()
-plt.xticks([])
-plt.yticks([])
-
-plt.subplot(2, 2, 2)
-plt.imshow(
-	test_data[:,:,r_index] - test_median_y, origin="lower", cmap="binary_r", 
-	#vmin=-0.1, vmax=0.1
-)
-plt.title("Raw Difference")
-plt.colorbar()
-plt.xticks([])
-plt.yticks([])
-
-plt.subplot(2, 2, 3)
-plt.imshow(display_delta_t[:, :, r_index], origin="lower", cmap="binary_r")
-plt.title("Destretch Vectors")
-plt.colorbar()
-plt.xticks([])
-plt.yticks([])
-#plt.quiver(
-#	np.arange(destretch_info.cpx)[::2], 
-#	np.arange(destretch_info.cpy)[::2],
-#	display_delta[0, ::2, ::2, r_index],
-#	display_delta[1, ::2, ::2, r_index],
-#	display_delta[::2, ::2, r_index],
-#	cmap="inferno_r"
-#)
-
-plt.subplot(2, 2, 4)
-plt.imshow(
-	answer[:, :, r_index] - test_median_y,
-	origin="lower", cmap="binary_r", 
-	#vmin=-0.01, vmax=0.01
-)
-plt.colorbar()
-plt.xticks([])
-plt.yticks([])
-plt.title("Destretched Difference")
-plt.tight_layout()
-plt.show()
+# r_index: int = 1
+# display_delta = (display.T - r_display.T).T
+# display_delta_t = np.sqrt(display_delta[0] ** 2 + display_delta[1] ** 2)
+# 
+# plt.figure(figsize=(12,10), facecolor="w")
+# 
+# plt.subplot(2, 2, 1)
+# plt.imshow(test_data[:,:,r_index], origin="lower", cmap="binary_r")
+# plt.title("Raw Scene")
+# plt.colorbar()
+# plt.xticks([])
+# plt.yticks([])
+# 
+# plt.subplot(2, 2, 2)
+# plt.imshow(
+# 	test_data[:,:,r_index] - test_median_y, origin="lower", cmap="binary_r", 
+# 	#vmin=-0.1, vmax=0.1
+# )
+# plt.title("Raw Difference")
+# plt.colorbar()
+# plt.xticks([])
+# plt.yticks([])
+# 
+# plt.subplot(2, 2, 3)
+# plt.imshow(display_delta_t[:, :, r_index], origin="lower", cmap="binary_r")
+# plt.title("Destretch Vectors")
+# plt.colorbar()
+# plt.xticks([])
+# plt.yticks([])
+# #plt.quiver(
+# #	np.arange(destretch_info.cpx)[::2], 
+# #	np.arange(destretch_info.cpy)[::2],
+# #	display_delta[0, ::2, ::2, r_index],
+# #	display_delta[1, ::2, ::2, r_index],
+# #	display_delta[::2, ::2, r_index],
+# #	cmap="inferno_r"
+# #)
+# 
+# plt.subplot(2, 2, 4)
+# plt.imshow(
+# 	answer[:, :, r_index] - test_median_y,
+# 	origin="lower", cmap="binary_r", 
+# 	#vmin=-0.01, vmax=0.01
+# )
+# plt.colorbar()
+# plt.xticks([])
+# plt.yticks([])
+# plt.title("Destretched Difference")
+# plt.tight_layout()
+# plt.show()
 
 
 ## Visualize Data -------------------------------------------------------------|
@@ -185,7 +190,7 @@ def draw_frame_original(index: int) -> AxesImage:
 # create an animation to view the image data in succession
 animation_original = matplotlib.animation.FuncAnimation(
 	figure, draw_frame_original, 
-	frames=answer.shape[2],
+	frames=len(result),
 	interval=100
 )
 
@@ -201,13 +206,13 @@ plot_post.set_yticks([])
 
 # create the images for rendering the new destretched image data
 frame_destretched = plt.imshow(
-	answer[:, :, 0], origin="lower", cmap="copper"
+	result[0], origin="lower", cmap="copper"
 )
 frame_destretched.set_rasterized(True)
 frame_destretched.set_animated(True)
-images_sequence_destretched: np.ndarray[AxesImage] = np.empty(answer.shape[2], dtype=AxesImage)
+images_sequence_destretched: np.ndarray[AxesImage] = np.empty(len(result), dtype=AxesImage)
 for i in range(len(images_sequence_destretched)):
-	images_sequence_destretched[i] = answer[:, :, i].copy()
+	images_sequence_destretched[i] = result[i].copy()
 
 # set the data for each frame of the new 
 def draw_frame_destretched(index: int) -> AxesImage:
