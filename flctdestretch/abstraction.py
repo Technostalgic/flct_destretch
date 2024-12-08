@@ -106,7 +106,7 @@ def destretch_files(
     print("Searching for image data in specified files...")
     for path in filepaths:
         hdus: HDUList = fits.open(path)
-        for hdu_index in range(len(hdus)):
+        for hdu_index in range(len(hdus)): 
             hdu = hdus[hdu_index]
             if hdu.data is not None or hdu is ImageHDU or hdu is CompImageHDU:
 
