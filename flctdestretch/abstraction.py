@@ -44,6 +44,19 @@ class IndexSchema(enum.Enum):
             from_schema: 'IndexSchema', 
             to_schema: 'IndexSchema'
         ) -> np.ndarray:
+        """
+        Create and return a new window for the data array to rearrange the 
+        indices based on the specified schemas.
+
+        Parameters
+        ----------
+        input: np.ndarray
+            the array to rearrange the indices of
+        from_schema: IndexSchema
+            the scheme that the array is currently
+        to_schema: IndexSchema
+            the schema you wish to change it to
+        """
 
         # don't need to do anything if the schemas are the same
         if from_schema == to_schema: return input
