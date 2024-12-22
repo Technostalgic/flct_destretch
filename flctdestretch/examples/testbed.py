@@ -6,21 +6,26 @@ import astropy.io.fits as fits
 
 import abstraction
 
-files_dir = os.path.join(".", "examples", "media")
-files_regex = re.compile("^test_1k_\d{2}\.fits$")
+files_dir = os.path.join(
+    ".", "examples", "media", "large"
+)
+files_regex = re.compile(
+    "^whitelight\.cln\.\d{8}_\d{6}\.im\d{5}\.seq\d{3}\.ext\d{3}\.fits$"
+	#"^test_1k_\d{2}\.fits$"
+)
 files = [
 	os.path.join(files_dir, filename)
     for filename in os.listdir(files_dir)
     if files_regex.match(filename)
-]
-print(files)
+][510:600]
+print(f"{len(files)} files found")
 
 datas: list[fits.HDUList] = []
 for file in files:
     data = fits.open(file)
     datas.append(data)
 
-data_cube = np.zeros((1000, 1000, 11))
+data_cube = np.zeros((1000, 1000, len(files)))
 i = 0
 for data in datas:
     for compdata in data:
@@ -172,16 +177,25 @@ figure: Figure = plt.figure(figsize=(5,4), dpi=169)
 # get handle to the specific subplot to render
 plot_pre = plt.subplot(1, 2, 1)
 plot_pre.set_title("Before FLCT Destretching")
-#plot_pre.set_xlim(0, 1000)
-#plot_pre.set_ylim(0, 1000)
+plot_pre.set_xlim(0, 1000)
+plot_pre.set_ylim(0, 1000)
 
 # hide x and y axis numbers since they are pretty much meaningless for images
 plot_pre.set_xticks([])
 plot_pre.set_yticks([])
 
+# calculate the image differences to apply normalization to displayed images
+print(f"original: [{np.min(test_data[:,:,0])}, {np.max(test_data[:,:,0])}]")
+print(f"destretched: [{np.min(result[0])}, {np.max(result[0])}]")
+range_orig = np.max(test_data[:,:,0]) - np.min(test_data[:,:,0])
+range_destr = np.max(result[0]) - np.min(result[0])
+vmin = -0.5
+vmax = 0.25
+
 # create image sequences for our original image data
 frame_original: AxesImage = plt.imshow(
-	test_data[:,:,0], origin="lower", cmap="copper"
+	test_data[:,:,0], origin="lower", cmap="copper",
+    vmin = vmin * range_orig, vmax = vmax * range_orig
 )
 frame_original.set_rasterized(True)
 frame_original.set_animated(True)
@@ -201,8 +215,8 @@ animation_original = matplotlib.animation.FuncAnimation(
 # arrange sublot and get handle
 plot_post = plt.subplot(1, 2, 2)
 plot_post.set_title("After FLCT Destretching")
-#plot_post.set_xlim(0, 1000)
-#plot_post.set_ylim(0, 1000)
+plot_post.set_xlim(0, 1000)
+plot_post.set_ylim(0, 1000)
 
 # hide x and y axis numbers since they are pretty much meaningless for images
 plot_post.set_xticks([])
@@ -210,7 +224,8 @@ plot_post.set_yticks([])
 
 # create the images for rendering the new destretched image data
 frame_destretched = plt.imshow(
-	result[0], origin="lower", cmap="copper"
+	result[0], origin="lower", cmap="copper",
+    vmin= vmin * range_destr, vmax= vmax * range_destr
 )
 frame_destretched.set_rasterized(True)
 frame_destretched.set_animated(True)

@@ -1,5 +1,6 @@
 import enum
 import os
+import time
 
 import numpy as np
 import astropy.io.fits as fits
@@ -106,6 +107,8 @@ def destretch_files(
         same output as reg_loop_series
     """
 
+    time_begin = time.time()
+
     # used to enforce the same resolution for all data files
     image_resolution = (-1,-1)
 
@@ -180,5 +183,9 @@ def destretch_files(
                     # store previously processed frame as reference image to use
                     # for nex image in series
                     reference_image = result_sequence[-1]
+
+    # output time elapsed
+    time_end = time.time()
+    print(f"Time elapsed: {time_end - time_begin} seconds")
 
     return result_sequence

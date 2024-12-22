@@ -7,3 +7,6 @@ dist/
 
 # backup / snapshot file pattern
 *~
+
+# large media folders
+large/
