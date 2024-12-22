@@ -1,28 +1,19 @@
+import os.path
+import re
+
 import numpy as np
 import astropy.io.fits as fits
-import os.path
+
 import abstraction
 
-# dir = ".\\examples\\media"
-# files = os.listdir(dir)
-# for i in range(len(files)):
-#     files[i] = os.path.join(dir, files[i])
-# files = files[1:-1]
+files_dir = os.path.join(".", "examples", "media")
+files_regex = re.compile("^test_1k_\d{2}\.fits$")
 files = [
-	os.path.join(".", "examples", "media", "test_1k_00.fits"),
-	os.path.join(".", "examples", "media", "test_1k_01.fits"),
-	os.path.join(".", "examples", "media", "test_1k_02.fits"),
-	os.path.join(".", "examples", "media", "test_1k_03.fits"),
-	os.path.join(".", "examples", "media", "test_1k_04.fits"),
-	os.path.join(".", "examples", "media", "test_1k_05.fits"),
-	os.path.join(".", "examples", "media", "test_1k_06.fits"),
-	os.path.join(".", "examples", "media", "test_1k_07.fits"),
-	os.path.join(".", "examples", "media", "test_1k_08.fits"),
-	os.path.join(".", "examples", "media", "test_1k_09.fits"),
-	os.path.join(".", "examples", "media", "test_1k_10.fits"),
+	os.path.join(files_dir, filename)
+    for filename in os.listdir(files_dir)
+    if files_regex.match(filename)
 ]
 print(files)
-
 
 datas: list[fits.HDUList] = []
 for file in files:

@@ -1,5 +1,5 @@
 import enum
-from typing import Self
+import os
 
 import numpy as np
 import astropy.io.fits as fits
@@ -82,11 +82,11 @@ class IndexSchema(enum.Enum):
         return np.transpose(input, axes=permute_order)
 
 def destretch_files(
-        filepaths: list[str], 
+        filepaths: list[os.PathLike], 
         kernel_sizes: list[int], 
         index_schema: IndexSchema
     ) -> list[
-        np.ndarray
+        np.ndarray | DestretchParams
     ]:
     """
     Compute the destretched result of data from all given files
@@ -102,7 +102,7 @@ def destretch_files(
 
     Returns
     -------
-    result : tuple[np.ndarray, np.ndarray, np.ndarray, DestretchParams]
+    result : list[np.ndarray, np.ndarray, np.ndarray, DestretchParams]
         same output as reg_loop_series
     """
 

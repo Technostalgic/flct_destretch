@@ -326,8 +326,6 @@ def controlpoint_offsets_fft(
     # number of array elements in each subfield
     nels = destr_info.kx * destr_info.ky
 
-    print("corrected code")
-
     for j in range(0, destr_info.cpy):
  
         for i in range(0, destr_info.cpx):
@@ -490,7 +488,6 @@ def reg_loop(scene, ref, kernel_sizes, mf=0.08, use_fft=True, adf2_pad=0.25, adf
 
     scene_temp = scene.copy()
     start = time.time()
-    print("Spacing Ratio: ", spacing_ratio)
 
     disp_sum     = np.zeros((2,scene_nx, scene_ny))
     offsets_sum  = np.zeros((2,scene_nx, scene_ny))
