@@ -63,7 +63,7 @@ def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor=False):
         #scene  = np.array(selector_events, order="F").astype(np.float32)
         #scene_float = scene.astype(np.float32)
         scene_float = scene
-        print(scene_float.shape, scene_float.dtype)
+        # print(scene_float.shape, scene_float.dtype)
         #scene_float = scene.copy
 
         ss00 = scene_float[x0, y0]

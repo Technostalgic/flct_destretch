@@ -147,7 +147,7 @@ def destretch_files(
                     # image_data = np.moveaxis(image_data, 0, -1)[:,:]
 
                     # debug log
-                    print(f"found {hdu_index} in {path}: {image_data.shape}")
+                    # print(f"found {hdu_index} in {path}: {image_data.shape}")
 
                     # if no previous image, use self for reference and result 
                     # image, do not process
@@ -176,7 +176,6 @@ def destretch_files(
 
                     # save the processed image in the results array
                     result_sequence.append(answer)
-                    print(f"processed image #{image_num}")
 
                     # store previously processed frame as reference image to use
                     # for nex image in series

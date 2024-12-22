@@ -518,7 +518,7 @@ def reg_loop(scene, ref, kernel_sizes, mf=0.08, use_fft=True, adf2_pad=0.25, adf
     rdisp_sum /= kernel_count
 
     end = time.time()
-    print(f"Total elapsed time {(end - start):.4f} seconds.")
+    # print(f"Total elapsed time {(end - start):.4f} seconds.")
     ans = scene_temp
 
     return ans, disp_sum, rdisp_sum, destr_info
