@@ -51,6 +51,9 @@ def bilin_control_points(scene, rdisp, disp, test=False):
     xy_ref_coordinates1 = np.zeros((2, scene_nx, scene_ny), order="F")
     xy_ref_coordinates = np.zeros((2, scene_nx, scene_ny), order="F")
 
+    # TODO change step size here - it is 1, we want it to be based on kernel 
+    # size and resolution (remember spacing ratio is how much each kernel 
+    # overlaps)
     xy_ref_coordinates[0, :, :] = [
         np.linspace(0, (scene_nx-1), num=scene_ny, dtype="int") 
         for el in range(scene_nx)
