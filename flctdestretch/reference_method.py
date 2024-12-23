@@ -24,19 +24,31 @@ class RefMethod(abc.ABC):
         self.filepaths: list[os.PathLike] = filepaths
 
     @abc.abstractmethod
-    def get_reference(
-        current_index: int
-    ) -> np.ndarray:
+    def get_reference(self, current_index: int) -> np.ndarray:
         """
         returns the image that should be used as the reference for calculating
         the destretched result from an original data image
 
         Parameters
         ----------
-        current_index: int
+        current_index : int
             the index of the current image that is to be processed
         """
         pass
+
+    @abc.abstractmethod
+    def get_original_data(self, current_index: int) -> np.ndarray | None:
+        """
+        will get the original data from the filepaths if precalculated, 
+        otherwise returns None
+
+        Parameters
+        ----------
+        current_index : int
+            the index of the current image that is to be processed
+        """
+        pass
+
 
 class MarginEndBehavior(enum.Enum):
     KEEP_RANGE: int = 0
@@ -86,7 +98,7 @@ class OMargin(RefMethod):
 
     def pass_params(self,
         current_index: int,
-        original_image: np.ndarray
+        original_image: np.ndarray = None
     ):
         # calculate the local margin values
         margin_min = current_index - self.margin_left
@@ -122,14 +134,17 @@ class OMargin(RefMethod):
             local_index = i - self.original_data_off
             if local_index >= len(self.original_data):
                 data: np.ndarray = None
-                if i == current_index:
+                if i == current_index and original_image is not None:
                     data = original_image
                 else:
-                    # TODO
-                    pass
+                    data = utility.load_image_data(self.filepaths[i])
                 self.original_data.append(data)
 
-    def get_reference(
-        current_index: int
-    ) -> np.ndarray:
-        pass
+    def get_reference(self, current_index: int) -> np.ndarray:
+        return np.median(np.stack(self.original_data, axis=2), axis=2)
+
+    def get_original_data(self, current_index) -> np.ndarray | None:
+        local_index = current_index - self.original_data_off
+        if len(self.original_data) > local_index:
+            return self.original_data[local_index]
+        return None
