@@ -105,7 +105,8 @@ def destretch_files(
         # decompose result
         answer: np.ndarray
         destretch_info: DestretchParams
-        answer, _, _, destretch_info = result
+        # use final displacement sum 'disp_sum' - 'rdisp_sum'
+        answer, disp_sum, rdisp_sum, destretch_info = result
 
         # save the processed image in the results array
         result_sequence.append(answer)
