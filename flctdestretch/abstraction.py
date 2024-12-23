@@ -8,12 +8,12 @@ from astropy.io.fits.hdu import HDUList, ImageHDU, CompImageHDU
 
 from algorithm import reg_loop, reg_loop_series
 from destretch_params import DestretchParams
-import reference_method
+import utility
 
 def destretch_files(
         filepaths: list[os.PathLike], 
         kernel_sizes: list[int], 
-        index_schema: reference_method.IndexSchema
+        index_schema: utility.IndexSchema
     ) -> list[
         np.ndarray | DestretchParams
     ]:
@@ -55,10 +55,10 @@ def destretch_files(
             if hdu.data is not None or hdu is ImageHDU or hdu is CompImageHDU:
 
                 # convert all data to default index schema
-                image_data: np.ndarray = reference_method.IndexSchema.convert(
+                image_data: np.ndarray = utility.IndexSchema.convert(
                     hdu.data, 
                     index_schema, 
-                    reference_method.IndexSchema.XYT
+                    utility.IndexSchema.XYT
                 )
 
                 if len(image_data.shape) == 2:
