@@ -3,10 +3,8 @@ import os
 import time
 
 import numpy as np
-import astropy.io.fits as fits
-from astropy.io.fits.hdu import HDUList, ImageHDU, CompImageHDU
 
-from algorithm import reg_loop, reg_loop_series
+from algorithm import reg_loop
 from destretch_params import DestretchParams
 import utility
 import reference_method
