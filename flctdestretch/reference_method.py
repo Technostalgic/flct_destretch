@@ -49,7 +49,6 @@ class RefMethod(abc.ABC):
         """
         pass
 
-
 class MarginEndBehavior(enum.Enum):
     KEEP_RANGE: int = 0
     TRIM_MARGINS: int = 1
