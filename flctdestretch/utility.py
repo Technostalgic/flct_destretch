@@ -1,6 +1,9 @@
+import os
 import enum
 
 import numpy as np
+import astropy.io.fits as fits
+from astropy.io.fits.hdu import HDUList, ImageHDU, CompImageHDU
 
 class IndexSchema(enum.Enum):
     """
@@ -74,3 +77,51 @@ class IndexSchema(enum.Enum):
 
         # Transpose the array accordingly
         return np.transpose(input, axes=permute_order)
+
+def load_image_data(
+        path: os.PathLike, 
+        schema: IndexSchema = IndexSchema.XY,
+        hdu_index: int | None = None,
+        z_index: int = 0
+    ) -> np.ndarray:
+    """
+    extract image data from a file in the form of an XY np.ndarray
+
+    Parameters
+    ----------
+    path : os.PathLike
+        the path to the file which we want to extract the image data from
+    schema : IndexSchema
+        the index schema of the input data
+    hdu_index : int
+        which hdu to select from the file. Will select the first valid hdu if
+        none specified
+    z_index : int
+        which z-slice to use if the specified data file contains a 3 dimensional 
+        data block (after applying the IndexSchema conversion)
+    """
+    # select the correct hdu by the specified hdu index
+    hdus: HDUList = fits.open(path)
+    hdu: ImageHDU | CompImageHDU = None
+    if hdu_index is None:
+        for unit in hdus:
+            if (
+                unit.data is not None or 
+                unit is ImageHDU or 
+                unit is CompImageHDU
+            ):
+                hdu = unit
+                break
+    else: hdu = hdus[hdu_index]
+    
+    # transform the image data from the data in the fits file
+    image_data: np.ndarray = IndexSchema.convert(
+        hdu.data, 
+        schema, 
+        IndexSchema.XYT
+    )
+    if len(image_data.shape) == 3:
+        image_data = image_data[:, :, z_index]
+    
+    return image_data
+    

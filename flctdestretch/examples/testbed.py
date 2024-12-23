@@ -5,6 +5,7 @@ import numpy as np
 import astropy.io.fits as fits
 
 import abstraction
+import utility
 
 files_dir = os.path.join(
     ".", "examples", "media", "large"
@@ -17,7 +18,7 @@ files = [
 	os.path.join(files_dir, filename)
     for filename in os.listdir(files_dir)
     if files_regex.match(filename)
-][510:600]
+][510:520]
 print(f"{len(files)} files found")
 
 datas: list[fits.HDUList] = []
@@ -97,7 +98,7 @@ print("Destretching images... ")
 result = abstraction.destretch_files(
 	files, 
     kernel_sizes, 
-    abstraction.IndexSchema.XY
+    utility.IndexSchema.XY
 )
 
 # # deconstruct the results into meaningful typed variables
