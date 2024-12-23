@@ -8,84 +8,12 @@ from astropy.io.fits.hdu import HDUList, ImageHDU, CompImageHDU
 
 from algorithm import reg_loop, reg_loop_series
 from destretch_params import DestretchParams
-
-class IndexSchema(enum.Enum):
-    """
-    Represents an index schema for an np.ndarray, showing which index in the 
-    array corresponds to which axis.\n
-    X - Spatial X axis, \n
-    Y - Spatial Y axis, \n
-    T - Temporal time axis. \n
-    For example, an IndexSchema.XYT represents an 3 dimensional array where
-    the 1st index is X, 2nd index is Y, and the 3rd index is T, accessed by 
-    `my_array[x_coord, y_coord, timestamp]`
-    """
-    XY = 0
-    YX = 1
-    XYT = 0
-    YXT = 1
-    TXY = 2
-    TYX = 3
-    XTY = 4
-    YTX = 5
-
-    # Axis permutations for each schema
-    __SCHEMA_TO_AXES = {
-        XYT: (0, 1, 2),
-        YXT: (1, 0, 2),
-        TXY: (2, 0, 1),
-        TYX: (2, 1, 0),
-        XTY: (0, 2, 1),
-        YTX: (1, 2, 0),
-    }
-
-    @staticmethod
-    def convert(
-            input: np.ndarray, 
-            from_schema: 'IndexSchema', 
-            to_schema: 'IndexSchema'
-        ) -> np.ndarray:
-        """
-        Create and return a new window for the data array to rearrange the 
-        indices based on the specified schemas.
-
-        Parameters
-        ----------
-        input: np.ndarray
-            the array to rearrange the indices of
-        from_schema: IndexSchema
-            the scheme that the array is currently
-        to_schema: IndexSchema
-            the schema you wish to change it to
-        """
-
-        # don't need to do anything if the schemas are the same
-        if from_schema == to_schema: return input
-
-        # Get the axis order for each schema
-        from_axes = IndexSchema.__SCHEMA_TO_AXES[from_schema]
-        to_axes = IndexSchema.__SCHEMA_TO_AXES[to_schema]
-
-        # ensure it works for 2d arrays
-        if len(input.shape) == 2:
-            if to_axes > 1 or from_axes > 1:
-                raise Exception(
-                    "2D arrays can only be converted with 2d " +
-                    "Schemas (IndexSchema.XY, IndexSchema.YX)"
-                )
-            from_axes = (from_axes[0], from_axes[1])
-            to_axes = (to_axes[0], to_axes[1])
-
-        # Create the permutation to transform from from_axes to to_axes
-        permute_order = [from_axes.index(axis) for axis in to_axes]
-
-        # Transpose the array accordingly
-        return np.transpose(input, axes=permute_order)
+import reference_method
 
 def destretch_files(
         filepaths: list[os.PathLike], 
         kernel_sizes: list[int], 
-        index_schema: IndexSchema
+        index_schema: reference_method.IndexSchema
     ) -> list[
         np.ndarray | DestretchParams
     ]:
@@ -98,7 +26,7 @@ def destretch_files(
         list of files in order to treat as image sequence for destretching
     kernel_sizes : ndarray (kx, ky, 2)
         the destretch kernel size, the size of each subframe to be processed
-    index_schema : IndexSchema
+    index_schema : reference_method.IndexSchema
         the index schema to use for the input data files
 
     Returns
@@ -127,10 +55,10 @@ def destretch_files(
             if hdu.data is not None or hdu is ImageHDU or hdu is CompImageHDU:
 
                 # convert all data to default index schema
-                image_data: np.ndarray = IndexSchema.convert(
+                image_data: np.ndarray = reference_method.IndexSchema.convert(
                     hdu.data, 
                     index_schema, 
-                    IndexSchema.XYT
+                    reference_method.IndexSchema.XYT
                 )
 
                 if len(image_data.shape) == 2:
@@ -144,7 +72,10 @@ def destretch_files(
                     elif (
                         image_resolution[0] != image_data.shape[0] or 
                         image_resolution[1] != image_data.shape[1]
-                    ): continue
+                    ): 
+                        raise Exception(
+                            f"Resolution mismatch for '{os.fspath(path)}'"
+                        )
 
                     # TODO seperate image data by z axis
                     # image_data = np.moveaxis(image_data, 0, -1)[:,:]
@@ -165,8 +96,8 @@ def destretch_files(
 
                     # perform image destretching
                     result = reg_loop(
-                        image_data, 
-                        reference_image, 
+                        image_data,
+                        reference_image,
                         kernel_sizes,
                         mf=0.08,
                         use_fft=True
