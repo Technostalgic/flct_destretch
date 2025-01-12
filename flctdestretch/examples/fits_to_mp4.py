@@ -1,13 +1,17 @@
 import os
 import cv2
 import numpy as np
-import utility
+
 from astropy.io import fits
+from matplotlib import cm
+
+import utility
 
 def fits_to_mp4(
         in_dir_path: os.PathLike | list[os.PathLike], 
         out_path: os.PathLike,
         fps: float = 24.0,
+        color_map: str = "copper",
         index_schema: utility.IndexSchema = utility.IndexSchema.XY,
         relative_min: float = 0,
         relative_max: float = 1,
@@ -54,6 +58,9 @@ def fits_to_mp4(
     data_max: float | None = None
     data_range: float | None = None
 
+    # get the colormap mapping function
+    map = cm.get_cmap(color_map)
+
     for path in fits_files:
 
         # Open the FITS file and extract image data
@@ -74,12 +81,11 @@ def fits_to_mp4(
             data_range *= (relative_max - relative_min)
         
         # normalize the data to 8-bit range (0-255) for visualization
-        thresh_data = np.clip((data - data_min) / data_range, 0, 1)
-        norm_data = (thresh_data * 255.0).astype(np.uint8)
-        frame = norm_data.astype(np.uint8)
+        norm_data = np.clip((data - data_min) / data_range, 0, 1)
 
         # convert grayscale to BGR for video
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+        frame = (map(norm_data) * 255.0).astype(np.uint8)
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
         # initialize video writer if not already initialized
         if video_writer is None:
