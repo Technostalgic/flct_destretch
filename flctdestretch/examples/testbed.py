@@ -21,20 +21,20 @@ files = [
 ][510:520]
 print(f"{len(files)} files found")
 
-datas: list[fits.HDUList] = []
-for file in files:
-    data = fits.open(file)
-    datas.append(data)
-
-data_cube = np.zeros((1000, 1000, len(files)))
-i = 0
-for data in datas:
-    for compdata in data:
-        if not (compdata.data is None):
-            data_cube[:,:,i] = compdata.data
-            i += 1
-
-data_combined = fits.HDUList([fits.ImageHDU(data_cube)])
+# datas: list[fits.HDUList] = []
+# for file in files:
+#     data = fits.open(file)
+#     datas.append(data)
+# 
+# data_cube = np.zeros((1000, 1000, len(files)))
+# i = 0
+# for data in datas:
+#     for compdata in data:
+#         if not (compdata.data is None):
+#             data_cube[:,:,i] = compdata.data
+#             i += 1
+# 
+# data_combined = fits.HDUList([fits.ImageHDU(data_cube)])
 #print(len(data_combined))
 
 ## Imports and Initialization -------------------------------------------------|
@@ -59,30 +59,30 @@ import algorithm as destretch
 
 ## Data Initialization --------------------------------------------------------|
 
-#data: fits.HDUList = data_combined
-image_data_0: fits.ImageHDU = data_combined[0]
-#print("Loaded! ")
-
-# test data ?? TODO explain better
-test_data: np.ndarray = image_data_0.data
-
-# process image ??
-#print("Preprocessing image data... ")
-test_data /= np.mean(test_data)
-test_data -= 1
-
-# median image for y axis ??
-test_median_y = np.median(test_data, axis=2)
-#print("Done! ")
+# #data: fits.HDUList = data_combined
+# image_data_0: fits.ImageHDU = data_combined[0]
+# #print("Loaded! ")
+# 
+# # test data ?? TODO explain better
+# test_data: np.ndarray = image_data_0.data
+# 
+# # process image ??
+# #print("Preprocessing image data... ")
+# test_data /= np.mean(test_data)
+# test_data -= 1
+# 
+# # median image for y axis ??
+# test_median_y = np.median(test_data, axis=2)
+# #print("Done! ")
 
 
 ## Perform Destretching -------------------------------------------------------|
 
 ## I think the sizes of each sub-image to relocate via destretch ??
-kernel_sizes: np.ndarray[np.int64] = np.array([64, 32])
+kernel_sizes: np.ndarray[np.int64] = np.array([128, 64])
 
 ## ?? TODO
-scene = np.moveaxis(test_data, 0, 0)
+# scene = np.moveaxis(test_data, 0, 0)
 
 print("Destretching images... ")
 # this goes through each image in the data and applies the destretching 
@@ -175,46 +175,46 @@ print("Visualizing data... ")
 # create a figure to render our data onto
 figure: Figure = plt.figure(figsize=(5,4), dpi=169)
 
-# get handle to the specific subplot to render
-plot_pre = plt.subplot(1, 2, 1)
-plot_pre.set_title("Before FLCT Destretching")
-plot_pre.set_xlim(0, 1000)
-plot_pre.set_ylim(0, 1000)
+# # get handle to the specific subplot to render
+# plot_pre = plt.subplot(1, 2, 1)
+# plot_pre.set_title("Before FLCT Destretching")
+# plot_pre.set_xlim(0, 1000)
+# plot_pre.set_ylim(0, 1000)
+# 
+# # hide x and y axis numbers since they are pretty much meaningless for images
+# plot_pre.set_xticks([])
+# plot_pre.set_yticks([])
 
-# hide x and y axis numbers since they are pretty much meaningless for images
-plot_pre.set_xticks([])
-plot_pre.set_yticks([])
-
-# calculate the image differences to apply normalization to displayed images
-print(f"original: [{np.min(test_data[:,:,0])}, {np.max(test_data[:,:,0])}]")
-print(f"destretched: [{np.min(result[0])}, {np.max(result[0])}]")
-range_orig = np.max(test_data[:,:,0]) - np.min(test_data[:,:,0])
+# # calculate the image differences to apply normalization to displayed images
+# print(f"original: [{np.min(test_data[:,:,0])}, {np.max(test_data[:,:,0])}]")
+# print(f"destretched: [{np.min(result[0])}, {np.max(result[0])}]")
+# range_orig = np.max(test_data[:,:,0]) - np.min(test_data[:,:,0])
 range_destr = np.max(result[0]) - np.min(result[0])
 vmin = -0.5
 vmax = 0.25
-
-# create image sequences for our original image data
-frame_original: AxesImage = plt.imshow(
-	test_data[:,:,0], origin="lower", cmap="copper",
-    vmin = vmin * range_orig, vmax = vmax * range_orig
-)
-frame_original.set_rasterized(True)
-frame_original.set_animated(True)
-
-# define the function to animate each frame
-def draw_frame_original(index: int) -> AxesImage:
-	frame_original.set_data(test_data[:, :, index])
-	return frame_original
-
-# create an animation to view the image data in succession
-animation_original = matplotlib.animation.FuncAnimation(
-	figure, draw_frame_original, 
-	frames=len(result),
-	interval=100
-)
+# 
+# # create image sequences for our original image data
+# frame_original: AxesImage = plt.imshow(
+# 	test_data[:,:,0], origin="lower", cmap="copper",
+#     vmin = vmin * range_orig, vmax = vmax * range_orig
+# )
+# frame_original.set_rasterized(True)
+# frame_original.set_animated(True)
+# 
+# # define the function to animate each frame
+# def draw_frame_original(index: int) -> AxesImage:
+# 	frame_original.set_data(test_data[:, :, index])
+# 	return frame_original
+# 
+# # create an animation to view the image data in succession
+# animation_original = matplotlib.animation.FuncAnimation(
+# 	figure, draw_frame_original, 
+# 	frames=len(result),
+# 	interval=100
+# )
 
 # arrange sublot and get handle
-plot_post = plt.subplot(1, 2, 2)
+plot_post = plt.subplot(1, 1, 1)
 plot_post.set_title("After FLCT Destretching")
 plot_post.set_xlim(0, 1000)
 plot_post.set_ylim(0, 1000)

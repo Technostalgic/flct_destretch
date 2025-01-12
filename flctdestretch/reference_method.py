@@ -36,7 +36,6 @@ class RefMethod(abc.ABC):
         """
         pass
 
-    @abc.abstractmethod
     def get_original_data(self, current_index: int) -> np.ndarray | None:
         """
         will get the original data from the filepaths if precalculated, 
@@ -47,8 +46,37 @@ class RefMethod(abc.ABC):
         current_index : int
             the index of the current image that is to be processed
         """
-        pass
+        return None
 
+class PreviousRef(RefMethod):
+    """
+    A simple reference method, it just uses the previous image as the reference.
+    NOTE This should not be used for destretching a final image sequence, as it 
+    will not account for distortions in any meaningful way, it's used mainly 
+    for preprocessing the data and then performing additional calculations
+    """
+
+    def __init__(self, filepaths: list[os.PathLike]):
+        super().__init__(filepaths)
+        self.previous_data: np.ndarray | None = None
+        self.cur_data: np.ndarray | None = None
+
+    def get_reference(self, current_index) -> np.ndarray:
+
+        # get the current frame data
+        self.cur_data = utility.load_image_data(self.filepaths[current_index])
+
+        # just use current data as reference if first frame
+        if self.previous_data is None:
+            self.previous_data = self.cur_data
+        
+        # cycle current data to previous
+        reference_data = self.previous_data
+        self.previous_data = self.cur_data
+        self.cur_data = None
+
+        return reference_data
+     
 class MarginEndBehavior(enum.Enum):
     KEEP_RANGE: int = 0
     TRIM_MARGINS: int = 1
