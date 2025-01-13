@@ -87,13 +87,22 @@ class OMargin(RefMethod):
     original dataset (with respect to the image currently being processed), and 
     `self.margin_right` of the images after. A composite median image is then 
     created from those images and returned as a reference image
+
+    Parameters
+    ----------
+    filepaths:
+        the paths to the files being processed,
+    left:
+        number of images before current image to include in ref margin
+    right:
+        number of images after current image to include in ref margin
     """
 
-    def __init__(self, filepaths = []):
+    def __init__(self, filepaths = [], left: int = 5, right: int = 5):
         super().__init__(filepaths)
         self.end_behavior: MarginEndBehavior = MarginEndBehavior.KEEP_RANGE
-        self.margin_left: int = 5
-        self.margin_right: int = 5
+        self.margin_left: int = left
+        self.margin_right: int = right
         self.original_data: list[np.ndarray] = []
         self.original_data_off = 0
         self.input_schema: utility.IndexSchema = utility.IndexSchema.XY
