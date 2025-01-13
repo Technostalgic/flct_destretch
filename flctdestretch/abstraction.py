@@ -1,7 +1,7 @@
 import enum
 import os
 import time
-from typing import Callable, TypedDict
+from typing import Callable, TypedDict, Any
 
 import numpy as np
 from astropy.io import fits
@@ -9,7 +9,7 @@ from astropy.io import fits
 from algorithm import reg_loop, DestretchLoopResult
 from destretch_params import DestretchParams
 from utility import IndexSchema, load_image_data
-from reference_method import RefMethod, OMargin, PreviousRef
+from reference_method import RefMethod, OMargin, PreviousRef, MarginEndBehavior
 
 class IterProcessArgs(TypedDict):
     """
@@ -29,11 +29,40 @@ class IterProcessArgs(TypedDict):
     index_schema: IndexSchema
     ref_method: RefMethod
 
+def fits_file_iter(
+        in_filepaths: list[os.PathLike],
+        iter_func: Callable[[np.ndarray], None],
+        index_schema: IndexSchema = IndexSchema.XY,
+        z_index: int | None = 0
+    ) -> None:
+    """
+    iterates over each data from each specified file calling the specified 
+    iter_func and passing the fits file data to that funciton
+
+    Parameters
+    ----------
+    in_filepaths:
+        the list of file paths to process
+    iter_func:
+        the function that is called for each frame after the image data has 
+        been processed it
+    z_index:
+        th z index slice to use in the image data if it is 3d data file (after 
+        converted from index schema). Set to None if you want the image data to 
+        remain as 3d
+    """
+    # iterate through each file data 
+    print("Searching for image data in specified files...")
+    for i in range(len(in_filepaths)):
+        path = in_filepaths[i]
+        image_data = load_image_data(path, index_schema, z_index)
+        iter_func(image_data)
+
 def fits_file_process_iter(
         in_filepaths: list[os.PathLike],
         iter_func: Callable[[DestretchLoopResult], None],
         ** kwargs: IterProcessArgs
-    ):
+    ) -> None:
     """
     iterates over each data from each specified file and applies destretching
     to each of them, calling the specified iter_func and passing the result of
@@ -222,3 +251,67 @@ def calc_offset_vectors(
 
     # iterate over data in files
     fits_file_process_iter(in_filepaths, process_iter, ** kwargs)
+
+def calc_rolling_mean(
+        in_filepaths: list[os.PathLike],
+        out_dir: os.PathLike,
+        out_filename: str = "offsets",
+        margin_left: int = 5,
+        margin_right: int = 5,
+        end_behavior: MarginEndBehavior = MarginEndBehavior.KEEP_RANGE
+    )-> None:
+    """
+    TODO - unfinished, function needs to be finished
+    """
+
+    # number of digits needed to accurately order the output files
+    out_name_digits: int = len(str(len(in_filepaths)))
+    index: int = 0
+    index_written: int = 0
+
+    file_count = len(in_filepaths)
+    original_data: list[np.ndarray]
+    original_data_off: int = 0
+
+    def iter_data(data: np.ndarray):
+        nonlocal index, index_written, original_data_off
+
+        # calculate the local margin values
+        margin_min = index - margin_left
+        margin_max = index + margin_right + 1
+        if margin_min < 0 or margin_max > file_count:
+            match end_behavior:
+                case MarginEndBehavior.KEEP_RANGE:
+                    margin_range = margin_max - margin_min
+                    if file_count < margin_range:
+                        margin_min = 0
+                        margin_max = file_count
+                    elif margin_min < 0:
+                        margin_min = 0
+                        margin_max = margin_range
+                    elif margin_max > file_count:
+                        margin_max = file_count
+                        margin_min = file_count - margin_range
+                case MarginEndBehavior.TRIM_MARGINS:
+                    margin_min = max(0, margin_min)
+                    margin_max = min(file_count, margin_max)
+
+        # remove datas who are no longer needed
+        # off_increment = margin_min - original_data_off
+        # original_data_off = margin_min
+        # for _ in range(off_increment):
+        #     original_data.pop(0)
+
+        local_index = index - original_data_off
+        if local_index >= len(original_data):
+            original_data.append(data)
+        
+        avg: np.ndarray = ...
+
+        # output the vectors as a new fits file
+        out_num = f"{index:0{out_name_digits}}"
+        out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
+        fits.writeto(out_path, avg, overwrite=True)
+        index += 1
+
+    fits_file_iter(in_filepaths, iter_data, IndexSchema.XYT, None)

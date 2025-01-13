@@ -83,7 +83,7 @@ def load_image_data(
         path: os.PathLike, 
         schema: IndexSchema = IndexSchema.XY,
         hdu_index: int | None = None,
-        z_index: int = 0
+        z_index: int | None = 0
     ) -> np.ndarray:
     """
     extract image data from a file in the form of an XY np.ndarray
@@ -99,7 +99,8 @@ def load_image_data(
         none specified
     z_index : int
         which z-slice to use if the specified data file contains a 3 dimensional 
-        data block (after applying the IndexSchema conversion)
+        data block (after applying the IndexSchema conversion). Set to None if
+        you want to keep the data as a 3d datacube
     """
     # select the correct hdu by the specified hdu index
     hdus: HDUList = fits.open(path)
@@ -121,7 +122,9 @@ def load_image_data(
         schema, 
         IndexSchema.XYT
     )
-    if len(image_data.shape) == 3:
+
+    # if z index is specified, only grab that slice
+    if len(image_data.shape) == 3 and z_index is not None:
         image_data = image_data[:, :, z_index]
     
     return image_data
