@@ -205,8 +205,3 @@ def calc_offset_vectors(
 
     # iterate over data in files
     fits_file_process_iter(in_filepaths, process_iter, ** kwargs)
-
-def calc_offset_vector_averages(
-        
-) -> None:
-    pass
