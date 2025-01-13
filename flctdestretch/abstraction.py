@@ -148,18 +148,28 @@ def destretch_files(
 
         # output the result as a new fits file
         out_num = f"{index:0{out_name_digits}}"
-        out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
+        out_path = os.path.join(out_dir, out_filename + f"{out_num}.fits")
         fits.writeto(out_path, result[0], overwrite=True)
         index += 1
 
     # iterate through file datas and call iter_process on destretched results
     fits_file_process_iter(in_filepaths, iter_process, ** kwargs)
 
-    # output time elapsed
+    # calculate time in appropriate units
     time_end = time.time()
+    time_taken = time_end - time_begin
+    time_units = "seconds"
+    if time_taken >= 120:
+        time_taken /= 60
+        time_units = "minutes"
+        if time_taken >= 120:
+            time_taken /= 60
+            time_units = "hours"
+    
+    # output time elapsed
     print(
         "Destretching complete! Time elapsed: " +
-        f"{time_end - time_begin} seconds"
+        f"{time_taken:.3f} {time_units}"
     )
 
 def calc_offset_vectors(
@@ -203,7 +213,7 @@ def calc_offset_vectors(
 
         # output the vectors as a new fits file
         out_num = f"{index:0{out_name_digits}}"
-        out_path = os.path.join(out_dir, out_filename + f"{out_num}.fits")
+        out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
         fits.writeto(out_path, offsets, overwrite=True)
         index += 1
     
