@@ -92,8 +92,8 @@ class OMargin(RefMethod):
     def __init__(self, filepaths = []):
         super().__init__(filepaths)
         self.end_behavior: MarginEndBehavior = MarginEndBehavior.KEEP_RANGE
-        self.margin_left: int = 1
-        self.margin_right: int = 1
+        self.margin_left: int = 5
+        self.margin_right: int = 5
         self.original_data: list[np.ndarray] = []
         self.original_data_off = 0
         self.input_schema: utility.IndexSchema = utility.IndexSchema.XY

@@ -106,13 +106,14 @@ def fits_file_process_iter(
         iter_func(result)
 
 def destretch_files(
-        filepaths: list[os.PathLike], 
+        in_filepaths: list[os.PathLike],
+        out_dir: os.PathLike,
+        out_filename: str = "destretched",
         ** kwargs: IterProcessArgs
-    ) -> list[
-        np.ndarray | DestretchParams
-    ]:
+    ) -> None:
     """
-    Compute the destretched result of data from all given files
+    Compute the destretched result of data from all given files, and export to 
+    new files
 
     Parameters
     ----------
@@ -127,33 +128,39 @@ def destretch_files(
         specified, will use reference_method.OMargin
     ** kwargs: 
         see IterProcessArgs class for all available arguments
-
-    Returns
-    -------
-    result : list[np.ndarray, np.ndarray, np.ndarray, DestretchParams]
-        same output as reg_loop_series
     """
 
     # start timing 
     time_begin = time.time()
 
-    # store the results
-    result_sequence: list[np.ndarray] = []
+    # number of digits needed to accurately order the output files
+    out_name_digits: int = len(str(len(in_filepaths)))
+    index: int = 0
+
+    # ensure output directory exists
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
 
     # function to handle processing of destretch loop results for each image
     # frame found in data files
     def iter_process(result: DestretchLoopResult):
-        # save the processed image in the results array
-        result_sequence.append(result[0])
+        nonlocal index
+
+        # output the result as a new fits file
+        out_num = f"{index:0{out_name_digits}}"
+        out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
+        fits.writeto(out_path, result[0], overwrite=True)
+        index += 1
 
     # iterate through file datas and call iter_process on destretched results
-    fits_file_process_iter(filepaths, iter_process, ** kwargs)
+    fits_file_process_iter(in_filepaths, iter_process, ** kwargs)
 
     # output time elapsed
     time_end = time.time()
-    print(f"Time elapsed: {time_end - time_begin} seconds")
-
-    return result_sequence
+    print(
+        "Destretching complete! Time elapsed: " +
+        f"{time_end - time_begin} seconds"
+    )
 
 def calc_offset_vectors(
         in_filepaths: list[os.PathLike],
@@ -196,7 +203,7 @@ def calc_offset_vectors(
 
         # output the vectors as a new fits file
         out_num = f"{index:0{out_name_digits}}"
-        out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
+        out_path = os.path.join(out_dir, out_filename + f"{out_num}.fits")
         fits.writeto(out_path, offsets, overwrite=True)
         index += 1
     
