@@ -10,3 +10,4 @@ dist/
 
 # large media folders
 large/
+*.mp4

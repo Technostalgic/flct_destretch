@@ -9,6 +9,7 @@ on implementation by Momchil Molnar
 import time
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
+from typing import Tuple, Literal, Any
 
 # internal
 from destretch_params import DestretchParams
@@ -467,7 +468,18 @@ def controlpoint_offsets_adf(
 
 ## Reg ------------------------------------------------------------------------|
 
-def reg_loop(scene, ref, kernel_sizes, mf=0.08, use_fft=True, adf2_pad=0.25, adf_pow=2, border_offset=4, spacing_ratio=0.5):
+DestretchLoopResult = Tuple[
+    np.ndarray[Any, np.dtype[np.float64]], 
+    np.ndarray[tuple[Literal[2], Any, Any], np.dtype[np.float64]],
+    np.ndarray[tuple[Literal[2], Any, Any], np.dtype[np.float64]],
+    DestretchParams
+]
+
+def reg_loop(
+        scene, ref, kernel_sizes, 
+        mf=0.08, use_fft=True, adf2_pad=0.25, adf_pow=2, border_offset=4, 
+        spacing_ratio=0.5
+    ) -> DestretchLoopResult:
     """
     Parameters
     ----------

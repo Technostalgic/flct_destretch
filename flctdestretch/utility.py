@@ -1,4 +1,5 @@
 import os
+import re
 import enum
 
 import numpy as np
@@ -59,8 +60,8 @@ class IndexSchema(enum.Enum):
         if from_schema == to_schema: return input
 
         # Get the axis order for each schema
-        from_axes = IndexSchema.__SCHEMA_TO_AXES[from_schema]
-        to_axes = IndexSchema.__SCHEMA_TO_AXES[to_schema]
+        from_axes = IndexSchema.__SCHEMA_TO_AXES[from_schema.value]
+        to_axes = IndexSchema.__SCHEMA_TO_AXES[to_schema.value]
 
         # ensure it works for 2d arrays
         if len(input.shape) == 2:
@@ -124,4 +125,12 @@ def load_image_data(
         image_data = image_data[:, :, z_index]
     
     return image_data
-    
+
+fits_regex = re.compile("^.*\.fits$")
+
+def get_fits_paths(in_dir: os.PathLike) -> list[str]:
+    return [
+        os.path.join(in_dir, filename)
+        for filename in os.listdir(in_dir)
+        if fits_regex.match(filename)
+    ]
