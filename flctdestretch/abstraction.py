@@ -264,16 +264,25 @@ def calc_rolling_mean(
     TODO - unfinished, function needs to be finished
     """
 
+    # data structures to store info about original datas
+    file_count = len(in_filepaths)
+    original_data: list[np.ndarray] = []
+    original_data_off: int = 0
+
     # number of digits needed to accurately order the output files
-    out_name_digits: int = len(str(len(in_filepaths)))
+    out_name_digits: int = len(file_count)
     index: int = 0
     index_written: int = 0
 
-    file_count = len(in_filepaths)
-    original_data: list[np.ndarray]
-    original_data_off: int = 0
+    # track the data average from the previous iterations
+    data_avg: np.ndarray | None = None
+    data_avg_start: int = 0
+    data_avg_end: int = 0
+    data_avg_range: int = 0
 
+    # define the local function that iterates over each data frame
     def iter_data(data: np.ndarray):
+        nonlocal data_avg, data_avg_start, data_avg_end, data_avg_range
         nonlocal index, index_written, original_data_off
 
         # calculate the local margin values
@@ -295,23 +304,79 @@ def calc_rolling_mean(
                 case MarginEndBehavior.TRIM_MARGINS:
                     margin_min = max(0, margin_min)
                     margin_max = min(file_count, margin_max)
+        margin_range: int = margin_max - margin_min
+        
+        # append current data to data list
+        local_index = index - original_data_off
+        if local_index >= len(original_data):
+            original_data.append(data)
 
         # remove datas who are no longer needed
         # off_increment = margin_min - original_data_off
         # original_data_off = margin_min
         # for _ in range(off_increment):
         #     original_data.pop(0)
-
-        local_index = index - original_data_off
-        if local_index >= len(original_data):
-            original_data.append(data)
         
-        avg: np.ndarray = ...
+        # if the entire margin is within the data list
+        local_marg_max = margin_min - original_data_off
+        if local_marg_max >= len(original_data):
+            local_marg_min = margin_min - original_data_off
 
-        # output the vectors as a new fits file
-        out_num = f"{index:0{out_name_digits}}"
-        out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
-        fits.writeto(out_path, avg, overwrite=True)
+            # calculate the average from scratch if it doesn't exist yet
+            if data_avg is None:
+                data_avg = original_data[local_marg_min]
+                for i in range(local_marg_min + 1, local_marg_max + 1):
+                    data_avg += original_data[i]
+                data_avg /= margin_range
+            
+            # if it does exist, remove the preceding datas, and add the datas 
+            # that need to be added
+            else:
+                # remove all preceding datas from average
+                local_avg_start = data_avg_start - original_data_off
+                for i in range(local_avg_start, local_marg_min):
+                    data_avg -= original_data[i] / data_avg_range
+
+                # adjust current avg weight to new range if changed
+                local_avg_end = data_avg_end - original_data_off
+                if data_avg_range != margin_range:
+                    avg_weight_prev_numerator = data_avg_range - (
+                        local_avg_start -
+                        local_marg_min
+                    )
+                    avg_weight_numerator = margin_range - (
+                        local_marg_max - 
+                        local_avg_end
+                    )
+                    data_avg /= avg_weight_prev_numerator / data_avg_range
+                    data_avg *= avg_weight_numerator
+
+                # add new datas to average
+                for i in range(local_avg_end, local_marg_max):
+                    data_avg += original_data[i] / margin_range
+            
+            # remove unneeded datas from beginning of data list
+            for _ in range(local_marg_min):
+                original_data.pop(0)
+                original_data_off += 1
+            
+            # update avg metadata
+            data_avg_start = margin_min
+            data_avg_end = margin_max
+            data_avg_range = margin_range
+
+        # output the averaged vectors as a new fits file
+        if data_avg is not None:
+            while index_written < index:
+                out_num = f"{index_written:0{out_name_digits}}"
+                out_path = os.path.join(
+                    out_dir, 
+                    out_filename + f"{out_num}.avg.off.fits"
+                )
+                fits.writeto(out_path, data_avg, overwrite=True)
+                index_written += 1
+
         index += 1
 
+    # apply the defined function to each data frame
     fits_file_iter(in_filepaths, iter_data, IndexSchema.XYT, None)
