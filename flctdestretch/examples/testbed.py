@@ -9,7 +9,7 @@ import numpy as np
 
 # internal
 import abstraction
-from utility import IndexSchema
+from utility import IndexSchema, get_fits_paths
 from examples.fits_to_mp4 import fits_to_mp4
 from reference_method import OMargin
 import algorithm as destretch
@@ -28,24 +28,36 @@ files = [
     os.path.join(files_dir, filename)
     for filename in os.listdir(files_dir)
     if files_regex.match(filename)
-][610:720]
+][610:620]
 print(f"{len(files)} files found")
 
 
 ## Perform Destretching -------------------------------------------------------|
 
 print("Destretching images... ")
-
-# out_dir = os.path.join(files_dir, "offsets")
-# abstraction.calc_offset_vectors(
-#     files,
-#     out_dir,
-#     "offset",
-#     kernel_sizes=kernel_sizes,
-#     index_schema=utility.IndexSchema.XY
-# )
-
 kernel_sizes: np.ndarray[np.int64] = np.array([64, 32])
+
+# calculate offset vectors
+offs_out_dir = os.path.join(files_dir, "off")
+print(f"calculating offsets... {offs_out_dir}")
+abstraction.calc_offset_vectors(
+    files,
+    offs_out_dir,
+    "offset",
+    kernel_sizes=kernel_sizes,
+    IndexSchema=IndexSchema.XY
+)
+
+# calculate rolling mean
+out_dir = os.path.join(files_dir, "avg")
+print(f"calculating offset rolling mean... {out_dir}")
+abstraction.calc_rolling_mean(
+    get_fits_paths(offs_out_dir),
+    out_dir,
+    "average"
+)
+
+# do actual destretch
 out_dir = os.path.join(files_dir, "destretched")
 result = abstraction.destretch_files(
     files,
