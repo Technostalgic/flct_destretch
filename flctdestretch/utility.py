@@ -65,7 +65,7 @@ class IndexSchema(enum.Enum):
 
         # ensure it works for 2d arrays
         if len(input.shape) == 2:
-            if to_axes > 1 or from_axes > 1:
+            if False and to_schema.value > 1 or from_schema.value > 1:
                 raise Exception(
                     "2D arrays can only be converted with 2d " +
                     "Schemas (IndexSchema.XY, IndexSchema.YX)"

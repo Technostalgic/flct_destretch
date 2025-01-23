@@ -18,7 +18,7 @@ import processing
 
 ## Control Points -------------------------------------------------------------|
 
-def bilin_control_points(scene, rdisp, disp, test=False):
+def bilin_control_points(scene, rdisp, disp):
     """
     Compute the coordinates of the pixels in the output images to be
     sampled from the input image (using Scipy.interpolate.RectBivariate).
@@ -43,33 +43,48 @@ def bilin_control_points(scene, rdisp, disp, test=False):
     scene_nx = scene.shape[0]
     scene_ny = scene.shape[1]
 
-    #compute the control points locations
+    # compute the control points locations
+    #     this assumes the x coordinates are same for all rows 
+    #     and the y-coordinates are the same for all columns
+    
+    # 1-D array of x-values of reference points
     cp_x_coords = rdisp[0, :, 0]
+    
+    # 1-D array of y-values of reference points
     cp_y_coords = rdisp[1, 0, :]
 
-    #compute the displacements
-
-    xy_ref_coordinates1 = np.zeros((2, scene_nx, scene_ny), order="F")
+    # define an array for x and y displacement coordinates, the same size 
+    # as the input scent
     xy_ref_coordinates = np.zeros((2, scene_nx, scene_ny), order="F")
 
-    # TODO change step size here - it is 1, we want it to be based on kernel 
-    # size and resolution (remember spacing ratio is how much each kernel 
-    # overlaps)
+    # this creates an array where values in array index 1 are constant,
+    # with a value corresponding to the values of array index 12 
     xy_ref_coordinates[0, :, :] = [
-        np.linspace(0, (scene_nx-1), num=scene_ny, dtype="int") 
+        np.linspace(
+            0, (scene_nx-1),
+            num = scene_ny, dtype="int"
+        )
         for el in range(scene_nx)
     ]
+    # this creates an array where values in array index 2 are constant,
+    # with a value corresponding to the values of array index 1 
     xy_ref_coordinates[1, :, :] = [
-        np.zeros(scene_ny, dtype="int") + el
+        np.zeros(
+            scene_ny, dtype="int"
+        ) + el
         for el in range(scene_nx)
     ]
 
+    # flip the axes
     xy_ref_coordinates = np.swapaxes(xy_ref_coordinates, 1, 2)
 
+    # calculate offsets between displaced and reference positions
     dd = disp - rdisp
 
-    interp_x = RectBivariateSpline(cp_x_coords, cp_y_coords, dd[0, :, :])
+    interp_x = RectBivariateSpline(cp_x_coords, cp_y_coords, dd[0, :, :], kx=4, ky=4, s=1000)
     interp_y = RectBivariateSpline(cp_x_coords, cp_y_coords, dd[1, :, :])
+    #interp_x = SmoothBivariateSpline((rdisp[0, :, :]).flatten(), (rdisp[1, :, :]).flatten(), (dd[0, :, :]).flatten())
+    #interp_y = SmoothBivariateSpline((rdisp[0, :, :]).flatten(), (rdisp[1, :, :]).flatten(), (dd[1, :, :]).flatten())
 
     xy_grid = np.zeros((2, scene_nx, scene_ny))
 
@@ -78,28 +93,27 @@ def bilin_control_points(scene, rdisp, disp, test=False):
 
     xy_grid[1, :, :] = 1. * interp_x.__call__(
         x_coords_output, 
-        y_coords_output, 
+        y_coords_output,
         grid=True
     )
-    xy_grid[0, :, :] = 1. *interp_y.__call__(
+    xy_grid[0, :, :] = 1. * interp_y.__call__(
         x_coords_output, 
-        y_coords_output, 
+        y_coords_output,
         grid=True
     )
 
-    # TODO implement proper test
     # if test == True:
-    #     im1 = plt.imshow(xy_grid[0, :, :])
-    #     plt.colorbar(im1)
-    #     plt.show()
-    # 
-    #     im2 = plt.imshow(xy_grid[1, :, :])
-    #     plt.colorbar(im2)
-    #     plt.show()
+    #    im1 = pl.imshow(xy_grid[0, :, :])
+    #    pl.colorbar(im1)
+    #    pl.show()
+    #
+    #    im2 = pl.imshow(xy_grid[1, :, :])
+    #    pl.colorbar(im2)
+    #    pl.show()
 
-    xy_grid += xy_ref_coordinates
+    xy_grid_coords = xy_grid + xy_ref_coordinates
 
-    return (xy_grid)
+    return xy_grid_coords, xy_grid
 
 def destr_control_points(
     reference, kernel, border_offset, spacing_ratio, mf=0.08
@@ -519,7 +533,7 @@ def reg_loop(
         )
         # remap displacements onto spatial grid of scene 
         # (i.e. the same number of pixels as the input image)
-        dispmap_new, offsets_new  = bilin_control_points(scene, rdisp, disp)
+        dispmap_new, offsets_new = bilin_control_points(scene, rdisp, disp)
         # add the displacement and offset maps to
         disp_sum     += dispmap_new
         offsets_sum  += offsets_new
@@ -645,7 +659,7 @@ def doreg(scene, r, d, destr_info):
 
     """
 
-    xy  = bilin_control_points(scene, r, d)
+    _, xy = bilin_control_points(scene, r, d)
     ans = processing.bilin_values_scene(scene, xy, destr_info)
 
     return ans
