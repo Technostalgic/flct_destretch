@@ -27,7 +27,7 @@ files = [
     os.path.join(files_dir, filename)
     for filename in os.listdir(files_dir)
     if files_regex.match(filename)
-][610:722]
+][610:622]
 print(f"{len(files)} files found")
 
 
@@ -74,7 +74,7 @@ out_file_destr_vid = os.path.join(files_dir, "video_destretched.mp4")
 fits_to_mp4(out_dir, out_file_destr_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25)
 
 out_file_flow_vid = os.path.join(files_dir, "video_flowmap.mp4")
-fits_to_mp4(out_avg_dir, out_file_flow_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25, True, True)
+fits_to_mp4(out_avg_dir, out_file_flow_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25, True)
 
 print(
     "Demo Complete! output videos at:\n" +

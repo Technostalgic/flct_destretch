@@ -17,7 +17,6 @@ def fits_to_mp4(
         relative_min: float = 0,
         relative_max: float = 1,
         normal_mode: bool = False,
-        pixel_adjust_y: bool = False,
     ):
     """
     convert a directory of .fits files into an mp4 video
@@ -77,10 +76,10 @@ def fits_to_mp4(
         data = utility.load_image_data(path, index_schema, z_index=None)
 
         ## TODO fix offsets increasing magnitude along y axis
-        if pixel_adjust_y:
-            print("adjusting for pixel offsets... " + str(frames_written))
-            sub = utility.IndexSchema.convert(np.transpose(np.indices((data.shape[0], data.shape[1], data.shape[2]))[0], (2,0,1)), utility.IndexSchema.TYX, utility.IndexSchema.YXT)
-            data -= sub
+        # if pixel_adjust_y:
+        #     print("adjusting for pixel offsets... " + str(frames_written))
+        #     sub = utility.IndexSchema.convert(np.transpose(np.indices((data.shape[0], data.shape[1], data.shape[2]))[0], (2,0,1)), utility.IndexSchema.TYX, utility.IndexSchema.YXT)
+        #     data -= sub
 
         # ensure data is 2D
         if not normal_mode and (data is None or data.ndim != 2):

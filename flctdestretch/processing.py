@@ -38,10 +38,9 @@ def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor=False):
         x = np.array(np.round(coords_new[0, :, :]), order="F", dtype=int)
         y = np.array(np.round(coords_new[1, :, :]), order="F", dtype=int)
         
-        scene_interp = scene[
-            np.clip(x,0,x.shape[0]-1), 
-            np.clip(y,0,y.shape[1]-1)
-        ]
+        print(scene.shape,x.shape,y.shape)
+        scene_interp = scene[np.clip(x,0,x.shape[0]-1), 
+                             np.clip(y,0,y.shape[1]-1)]
 
     else:
         x = np.array(coords_new[0, :, :], order="F")
@@ -63,12 +62,12 @@ def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor=False):
         #scene  = np.array(selector_events, order="F").astype(np.float32)
         #scene_float = scene.astype(np.float32)
         scene_float = scene
-        # print(scene_float.shape, scene_float.dtype)
+        #print(scene_float.shape, scene_float.dtype)
         #scene_float = scene.copy
 
         ss00 = scene_float[x0, y0]
         ss01 = scene_float[x0, y1]
-        ssfx00 = (scene_float[x1, y0] - ss00) * fx
+        ssfx00 =                (scene_float[x1, y0] - ss00) * fx
         ssfy01 = (ss01 - ss00 + (scene_float[x1, y1] - ss01) * fx - ssfx00) * fy
         scene_interp  = ss00 + ssfx00 + ssfy01
 
@@ -99,9 +98,9 @@ def apod_mask(nx, ny, fraction=0.08):
     filt_x = signal.windows.blackman(2 * taper_wx)
     filt_y = signal.windows.blackman(2 * taper_wy)
 
-    left = np.zeros(taper_wx) # filt_x[:taper_wx]
+    left = filt_x[:taper_wx]
     right = left[::-1]
-    top = np.zeros(taper_wx) # filt_y[:taper_wy]
+    top = filt_y[:taper_wy]
     bottom = top[::-1]
     center_x = np.ones(nx - 2*taper_wx)
     center_y = np.ones(ny - 2*taper_wy)
@@ -160,7 +159,7 @@ def smouth(nx, ny):
 
     return mm
 
-def crosscor_maxpos(cc, order=1):
+def crosscor_maxpos(cc, max_fit_method=1):
     """
     TODO docstring
     """
@@ -175,7 +174,7 @@ def crosscor_maxpos(cc, order=1):
     #(from Niblack, W: An Introduction to Digital Image Processing, p 139.)
 
     if xmax*ymax > 0 and xmax < (ccsz[0]-1) and ymax < (ccsz[1]-1):
-        if order == 1:
+        if max_fit_method == 1:
             denom = 2 * mx - cc[xmax-1,ymax] - cc[xmax+1,ymax]
             xfra = (xmax-1/2) + (mx-cc[xmax-1,ymax])/denom
 
@@ -184,31 +183,13 @@ def crosscor_maxpos(cc, order=1):
 
             xmax=xfra
             ymax=yfra
-        elif order == 2:
-            a2 = (
-                cc[xmax+1, ymax] - 
-                cc[xmax-1, ymax]
-            ) / 2.
-            a3 = (
-                cc[xmax+1, ymax]/2. - 
-                cc[xmax, ymax] + 
-                cc[xmax-1, ymax]/2.
-            )
-            a4 = (
-                cc[xmax, ymax+1] - 
-                cc[xmax, ymax-1]
-            ) / 2.
-            a5 = (
-                cc[xmax, ymax+1]/2. - 
-                cc[xmax, ymax] + 
-                cc[xmax, ymax-1]/2.
-            )
-            a6 = (
-                cc[xmax+1, ymax+1] - 
-                cc[xmax+1, ymax-1] - 
-                cc[xmax-1, ymax+1] + 
-                cc[xmax-1, ymax-1]
-            ) / 4.
+        elif max_fit_method == 2:
+            a2 = (cc[xmax+1, ymax] - cc[xmax-1, ymax])/2.
+            a3 = (cc[xmax+1, ymax]/2. - cc[xmax, ymax] + cc[xmax-1, ymax]/2.)
+            a4 = (cc[xmax, ymax+1] - cc[xmax, ymax-1])/2.
+            a5 = (cc[xmax, ymax+1]/2. - cc[xmax, ymax] + cc[xmax, ymax-1]/2.)
+            a6 = (cc[xmax+1, ymax+1] - cc[xmax+1, ymax-1] 
+                - cc[xmax-1, ymax+1] + cc[xmax-1, ymax-1])/4.
             xdif = (2*a2*a5 - a4*a6) / (a6**2 - 4*a3*a5)
             ydif = (2*a3*a4 - a2*a6) / (a6**2 - 4*a3*a5)
             xmax = xmax + xdif
@@ -243,11 +224,7 @@ def surface_fit(points_array, order=0):
         L, M = points_array.shape
         X1, X2 = np.mgrid[:L, :M]
         # reshape independent variables into form [a, b*X1, c*X2]
-        X = np.hstack((
-            np.ones((L*M, 1)), 
-            X1.reshape((L*M, 1)), 
-            X2.reshape((L*M, 1))
-        ))
+        X = np.hstack((np.ones((L*M, 1)), X1.reshape((L*M, 1)), X2.reshape((L*M, 1))))
         # reshape dependent variable into column vector
         YY = points_array.reshape((L*M, 1))
         # calculate normal vector of plane: theta = [X.T X]^-1 X.T YY
