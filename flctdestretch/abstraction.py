@@ -121,7 +121,7 @@ def fits_file_process_iter(
         reference_image = ref_method.get_reference(i)
 
         # perform image destretching
-        print(f"processing image #{i}..")
+        print(f"processing image #{i}.." + in_filepaths[i])
         result = reg_loop(
             image_data,
             reference_image,
