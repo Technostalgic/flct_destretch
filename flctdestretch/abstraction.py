@@ -6,7 +6,11 @@ from typing import Callable, TypedDict, Any
 import numpy as np
 from astropy.io import fits
 
-from algorithm import reg_loop, DestretchLoopResult
+from algorithm import (
+    doreg, destr_control_points, controlpoint_offsets_fft, doref,
+    DestretchLoopResult, DestretchParams
+)
+import processing
 from utility import IndexSchema, load_image_data
 from reference_method import RefMethod, OMargin, PreviousRef, MarginEndBehavior
 
@@ -58,7 +62,9 @@ def fits_file_iter(
         iter_func(image_data)
 
 def fits_file_process_iter(
-        in_filepaths: list[os.PathLike],
+        in_data_files: list[os.PathLike],
+        in_off_files: list[os.PathLike],
+        in_avg_files: list[os.PathLike],
         iter_func: Callable[[DestretchLoopResult], None],
         ** kwargs: IterProcessArgs
     ) -> None:
@@ -69,7 +75,7 @@ def fits_file_process_iter(
 
     Parameters
     ----------
-    in_filepaths:
+    in_data_files:
         the list of file paths to process
     iter_func:
         the function that is called for each frame after the image data has 
@@ -79,7 +85,10 @@ def fits_file_process_iter(
     # get required kwargs or default values if not specified
     kernel_sizes: list[int] = kwargs.get("kernel_sizes", [64, 32])
     index_schema: IndexSchema = kwargs.get("index_schema", IndexSchema.XYT)
-    ref_method: RefMethod = kwargs.get("ref_method", OMargin(in_filepaths))
+
+    # ensure there is an offset for each data
+    if(len(in_data_files) != len(in_off_files)):
+        raise Exception("Each data file must have a corresponging offset")
 
     # used to enforce the same resolution for all data files
     image_resolution = (-1,-1)
@@ -89,18 +98,15 @@ def fits_file_process_iter(
 
     # iterate through each file
     print("Searching for image data in specified files...")
-    for i in range(len(in_filepaths)):
-        path = in_filepaths[i]
-        
-        # pass data to reference method so it can do its thing
-        match ref_method:
-            case OMargin():
-                ref_method.pass_params(i)
+    for i in range(len(in_data_files)):
+        path_data = in_data_files[i]
+        path_off = in_off_files[i]
+        path_avg = in_avg_files[i]
         
         # get the image data from ref method if available otherwise load it
-        image_data: np.ndarray = ref_method.get_original_data(i)
-        if image_data is None:
-            image_data = load_image_data(path, index_schema)
+        image_data = load_image_data(path_data, index_schema)
+        off_data = load_image_data(path_off, index_schema, z_index=None)
+        avg_data = load_image_data(path_avg, index_schema, z_index=None)
 
         # ensure all data matches the first file's resolution
         if image_resolution[0] < 0:
@@ -110,31 +116,79 @@ def fits_file_process_iter(
             )
         elif (
             image_resolution[0] != image_data.shape[0] or 
-            image_resolution[1] != image_data.shape[1]
+            image_resolution[1] != image_data.shape[1] or
+            image_resolution[0] != off_data.shape[0] or
+            image_resolution[1] != off_data.shape[1] or
+            image_resolution[0] != avg_data.shape[0] or
+            image_resolution[1] != avg_data.shape[1] 
         ): 
-            raise Exception(f"Resolution mismatch for '{os.fspath(path)}'")
+            raise Exception(
+                f"Resolution mismatch for '{os.fspath(path_data), path_avg}'"
+            )
 
-        # debug log
-        # print(f"found {hdu_index} in {path}: {image_data.shape}")
 
-        # get the reference image from the specified reference method
-        reference_image = ref_method.get_reference(i)
+        # # perform image destretching
+        # print(f"processing image #{i}.." + in_data_files[i])
+        # result = reg_loop(
+        #     image_data,
+        #     reference_image,
+        #     kernel_sizes,
+        #     mf=0.08,
+        #     use_fft=True
+        # )
 
-        # perform image destretching
-        print(f"processing image #{i}.." + in_filepaths[i])
-        result = reg_loop(
+        destr_params, rdisp = destr_control_points(
             image_data,
-            reference_image,
-            kernel_sizes,
-            mf=0.08,
-            use_fft=True
+            np.zeros((1,1)), # kernel?
+            border_offset=0, # should be default?
+            spacing_ratio=0 # should be defailt?
+        )
+
+        # calculate the corrected result
+        corrected_off_data = avg_data - off_data # this result should be disp - rdisp
+        # swap the indices back around because we fucked up the order when 
+        # writing the files
+        corrected_off_data = IndexSchema.convert(
+            corrected_off_data,
+            IndexSchema.XYT, IndexSchema.TYX
+        )
+        # apod_window = processing.apod_mask(
+        #     destr_params.kx, 
+        #     destr_params.ky, 
+        #     destr_params.mf
+        # )
+        # subfield_fftconj, _ = doref(
+        #     ref, # why do we need reference here? (we shouldn't)
+        #     apod_window, 
+        #     destr_params
+        # )
+        # # fft
+        # disp = controlpoint_offsets_fft(
+        #     image_data, 
+        #     subfield_fftconj, # problematic
+        #     apod_window, 
+        #     processing.smouth(destr_params.kx, destr_params.ky), 
+        #     destr_params
+        # )
+        result = (
+            doreg(
+                image_data, 
+                rdisp,
+                rdisp + corrected_off_data,
+                destr_params
+            ),
+            None,
+            None,
+            destr_params,
         )
 
         # call the function specified by caller
         iter_func(result)
 
 def destretch_files(
-        in_filepaths: list[os.PathLike],
+        in_data_files: list[os.PathLike],
+        in_off_files: list[os.PathLike],
+        in_avg_files: list[os.PathLike],
         out_dir: os.PathLike,
         out_filename: str = "destretched",
         ** kwargs: IterProcessArgs
@@ -162,7 +216,7 @@ def destretch_files(
     time_begin = time.time()
 
     # number of digits needed to accurately order the output files
-    out_name_digits: int = len(str(len(in_filepaths)))
+    out_name_digits: int = len(str(len(in_data_files)))
     index: int = 0
 
     # ensure output directory exists
@@ -181,7 +235,11 @@ def destretch_files(
         index += 1
 
     # iterate through file datas and call iter_process on destretched results
-    fits_file_process_iter(in_filepaths, iter_process, ** kwargs)
+    fits_file_process_iter(
+        in_data_files, in_off_files, in_avg_files, 
+        iter_process, 
+        ** kwargs
+    )
 
     # calculate time in appropriate units
     time_end = time.time()
@@ -348,11 +406,12 @@ def calc_rolling_mean(
             local_marg_min = margin_min - original_data_off
 
             # calculate the average from scratch if it doesn't exist yet
-            if data_avg is None:
-                data_avg = original_data[local_marg_min]
-                for i in range(local_marg_min + 1, local_marg_max):
-                    data_avg += original_data[i].copy()
-                data_avg /= margin_range
+            if data_avg is None or True:
+                # data_avg = original_data[local_marg_min]
+                # for i in range(local_marg_min + 1, local_marg_max):
+                #     data_avg += original_data[i].copy()
+                # data_avg /= margin_range
+                data_avg = np.median(original_data[local_marg_min + 1 : local_marg_max], 0)
             
             # if it does exist, remove the preceding datas, and add the datas 
             # that need to be added

@@ -219,6 +219,10 @@ def destr_control_points(
         destr_info.spacing_y  = int(destr_info.ky * spacing_ratio)
         destr_info.spacing_x += destr_info.spacing_x % 2
         destr_info.spacing_y += destr_info.spacing_y % 2
+        if destr_info.spacing_x <= 0:
+            destr_info.spacing_x = 1
+        if destr_info.spacing_y <= 0:
+            destr_info.spacing_y = 1
 
         # divide the number of allowable pixels by the control points, round down to nearest integer
         num_grid_x        = int(allowable_range_x / destr_info.spacing_x) + 1
