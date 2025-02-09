@@ -27,7 +27,10 @@ files = [
     os.path.join(files_dir, filename)
     for filename in os.listdir(files_dir)
     if files_regex.match(filename)
-][610:722]
+]
+files.sort()
+files = files[610:722]
+print("\n".join(files))
 print(f"{len(files)} files found")
 
 
@@ -41,22 +44,22 @@ out_avg_dir = os.path.join(files_dir, "avg")
 out_dir = os.path.join(files_dir, "destretched")
 
 # # calculate offset vectors
-# print(f"calculating offsets... {offs_out_dir}")
-# abstraction.calc_offset_vectors(
-#     files,
-#     offs_out_dir,
-#     "offset",
-#     kernel_sizes=kernel_sizes,
-#     IndexSchema=IndexSchema.XY
-# )
-# 
+print(f"calculating offsets... {out_off_dir}")
+abstraction.calc_offset_vectors(
+    files,
+    out_off_dir,
+    "offset",
+    kernel_sizes=kernel_sizes,
+    IndexSchema=IndexSchema.XY
+)
+
 # calculate rolling mean
-# print(f"calculating offset rolling mean... {out_avg_dir}")
-# abstraction.calc_rolling_mean(
-#     get_fits_paths(offs_out_dir),
-#     out_avg_dir,
-#     "average"
-# )
+print(f"calculating offset rolling mean... {out_avg_dir}")
+abstraction.calc_rolling_mean(
+    get_fits_paths(out_off_dir),
+    out_avg_dir,
+    "average"
+)
 
 # do actual destretch
 result = abstraction.destretch_files(
@@ -77,7 +80,7 @@ out_file_off_vid = os.path.join(files_dir, "video_offmap.mp4")
 # output results as video files
 fits_to_mp4(files, out_file_orig_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25)
 fits_to_mp4(out_dir, out_file_destr_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25)
-# fits_to_mp4(out_avg_dir, out_file_flow_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25, True)
-# fits_to_mp4(offs_out_dir, out_file_off_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25, True)
+fits_to_mp4(out_avg_dir, out_file_flow_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25, True)
+fits_to_mp4(out_off_dir, out_file_off_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25, True)
 
 print("Demo Complete!")

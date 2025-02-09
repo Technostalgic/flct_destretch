@@ -7,7 +7,7 @@ import numpy as np
 from astropy.io import fits
 
 from algorithm import (
-    doreg, destr_control_points, controlpoint_offsets_fft, doref,
+    doreg, destr_control_points, reg_loop,
     DestretchLoopResult, DestretchParams
 )
 import processing
@@ -60,6 +60,82 @@ def fits_file_iter(
         path = in_filepaths[i]
         image_data = load_image_data(path, index_schema, z_index=z_index)
         iter_func(image_data)
+
+def fits_file_destretch_iter(
+        in_filepaths: list[os.PathLike],
+        iter_func: Callable[[DestretchLoopResult], None],
+        ** kwargs: IterProcessArgs
+    ) -> None:
+    """
+    iterates over each data from each specified file and applies destretching
+    to each of them, calling the specified iter_func and passing the result of
+    destretching to that funciton
+
+    Parameters
+    ----------
+    in_filepaths:
+        the list of file paths to process
+    iter_func:
+        the function that is called for each frame after the image data has 
+        been processed it
+    """
+
+    # get required kwargs or default values if not specified
+    kernel_sizes: list[int] = kwargs.get("kernel_sizes", [64, 32])
+    index_schema: IndexSchema = kwargs.get("index_schema", IndexSchema.XYT)
+    ref_method: RefMethod = kwargs.get("ref_method", OMargin(in_filepaths))
+
+    # used to enforce the same resolution for all data files
+    image_resolution = (-1,-1)
+
+    # reference image to feed into next destretch loop
+    reference_image: np.ndarray | None = None
+
+    # iterate through each file
+    print("Searching for image data in specified files...")
+    for i in range(len(in_filepaths)):
+        path = in_filepaths[i]
+        
+        # pass data to reference method so it can do its thing
+        match ref_method:
+            case OMargin():
+                ref_method.pass_params(i)
+        
+        # get the image data from ref method if available otherwise load it
+        image_data: np.ndarray = ref_method.get_original_data(i)
+        if image_data is None:
+            image_data = load_image_data(path, index_schema)
+
+        # ensure all data matches the first file's resolution
+        if image_resolution[0] < 0:
+            image_resolution = (
+                image_data.shape[0], 
+                image_data.shape[1]
+            )
+        elif (
+            image_resolution[0] != image_data.shape[0] or 
+            image_resolution[1] != image_data.shape[1]
+        ): 
+            raise Exception(f"Resolution mismatch for '{os.fspath(path)}'")
+
+        # debug log
+        # print(f"found {hdu_index} in {path}: {image_data.shape}")
+
+        # get the reference image from the specified reference method
+        reference_image = ref_method.get_reference(i)
+
+        # perform image destretching
+        print(f"processing image #{i}.." + in_filepaths[i])
+        result = reg_loop(
+            image_data,
+            reference_image,
+            kernel_sizes,
+            mf=0.08,
+            use_fft=True
+        )
+
+        # call the function specified by caller
+        iter_func(result)
 
 def fits_file_process_iter(
         in_data_files: list[os.PathLike],
@@ -307,7 +383,7 @@ def calc_offset_vectors(
     kwargs["ref_method"] = kwargs.get("ref_method", PreviousRef(in_filepaths))
 
     # iterate over data in files
-    fits_file_process_iter(in_filepaths, process_iter, ** kwargs)
+    fits_file_destretch_iter(in_filepaths, process_iter, ** kwargs)
 
 def calc_rolling_mean(
         in_filepaths: list[os.PathLike],
