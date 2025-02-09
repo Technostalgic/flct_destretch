@@ -81,7 +81,6 @@ class IndexSchema(enum.Enum):
 
 def load_image_data(
         path: os.PathLike, 
-        schema: IndexSchema = IndexSchema.XY,
         hdu_index: int | None = None,
         z_index: int | None = 0
     ) -> np.ndarray:
@@ -117,15 +116,11 @@ def load_image_data(
     else: hdu = hdus[hdu_index]
     
     # transform the image data from the data in the fits file
-    image_data: np.ndarray = IndexSchema.convert(
-        hdu.data, 
-        schema, 
-        IndexSchema.XYT
-    )
+    image_data: np.ndarray = hdu.data
 
     # if z index is specified, only grab that slice
     if len(image_data.shape) == 3 and z_index is not None:
-        image_data = image_data[:, :, z_index]
+        image_data = image_data[z_index, :, :]
     
     return image_data
 

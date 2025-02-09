@@ -44,22 +44,22 @@ out_avg_dir = os.path.join(files_dir, "avg")
 out_dir = os.path.join(files_dir, "destretched")
 
 # # calculate offset vectors
-print(f"calculating offsets... {out_off_dir}")
-abstraction.calc_offset_vectors(
-    files,
-    out_off_dir,
-    "offset",
-    kernel_sizes=kernel_sizes,
-    IndexSchema=IndexSchema.XY
-)
-
-# calculate rolling mean
-print(f"calculating offset rolling mean... {out_avg_dir}")
-abstraction.calc_rolling_mean(
-    get_fits_paths(out_off_dir),
-    out_avg_dir,
-    "average"
-)
+# print(f"calculating offsets... {out_off_dir}")
+# abstraction.calc_offset_vectors(
+#     files,
+#     out_off_dir,
+#     "offset",
+#     kernel_sizes=kernel_sizes,
+#     IndexSchema=IndexSchema.XY
+# )
+# 
+# # calculate rolling mean
+# print(f"calculating offset rolling mean... {out_avg_dir}")
+# abstraction.calc_rolling_mean(
+#     get_fits_paths(out_off_dir),
+#     out_avg_dir,
+#     "average"
+# )
 
 # do actual destretch
 result = abstraction.destretch_files(

@@ -31,12 +31,13 @@ class IterProcessArgs(TypedDict):
     kernel_sizes: list[int]
     index_schema: IndexSchema
     ref_method: RefMethod
+    out_paths: list[os.PathLike]
 
 def fits_file_iter(
         in_filepaths: list[os.PathLike],
         iter_func: Callable[[np.ndarray], None],
-        index_schema: IndexSchema = IndexSchema.XY,
-        z_index: int | None = 0
+        z_index: int | None = 0,
+        ** kwargs
     ) -> None:
     """
     iterates over each data from each specified file calling the specified 
@@ -58,7 +59,7 @@ def fits_file_iter(
     print("Searching for image data in specified files...")
     for i in range(len(in_filepaths)):
         path = in_filepaths[i]
-        image_data = load_image_data(path, index_schema, z_index=z_index)
+        image_data = load_image_data(path, z_index=z_index)
         iter_func(image_data)
 
 def fits_file_destretch_iter(
@@ -82,11 +83,10 @@ def fits_file_destretch_iter(
 
     # get required kwargs or default values if not specified
     kernel_sizes: list[int] = kwargs.get("kernel_sizes", [64, 32])
-    index_schema: IndexSchema = kwargs.get("index_schema", IndexSchema.XYT)
     ref_method: RefMethod = kwargs.get("ref_method", OMargin(in_filepaths))
 
     # used to enforce the same resolution for all data files
-    image_resolution = (-1,-1)
+    image_resolution = [-1,-1]
 
     # reference image to feed into next destretch loop
     reference_image: np.ndarray | None = None
@@ -104,18 +104,19 @@ def fits_file_destretch_iter(
         # get the image data from ref method if available otherwise load it
         image_data: np.ndarray = ref_method.get_original_data(i)
         if image_data is None:
-            image_data = load_image_data(path, index_schema)
+            image_data = load_image_data(path)
 
         # ensure all data matches the first file's resolution
-        if image_resolution[0] < 0:
+        if image_resolution[-1] < 0:
             image_resolution = (
-                image_data.shape[0], 
-                image_data.shape[1]
+                image_data.shape[-1], 
+                image_data.shape[-2]
             )
         elif (
-            image_resolution[0] != image_data.shape[0] or 
-            image_resolution[1] != image_data.shape[1]
+            image_resolution[-1] != image_data.shape[-1] or 
+            image_resolution[-2] != image_data.shape[-2]
         ): 
+            print(image_resolution, image_data.shape)
             raise Exception(f"Resolution mismatch for '{os.fspath(path)}'")
 
         # debug log
@@ -130,8 +131,6 @@ def fits_file_destretch_iter(
             image_data,
             reference_image,
             kernel_sizes,
-            mf=0.08,
-            use_fft=True
         )
 
         # call the function specified by caller
@@ -167,7 +166,7 @@ def fits_file_process_iter(
         raise Exception("Each data file must have a corresponging offset")
 
     # used to enforce the same resolution for all data files
-    image_resolution = (-1,-1)
+    image_resolution = [-1,-1]
 
     # reference image to feed into next destretch loop
     reference_image: np.ndarray | None = None
@@ -180,24 +179,29 @@ def fits_file_process_iter(
         path_avg = in_avg_files[i]
         
         # get the image data from ref method if available otherwise load it
-        image_data = load_image_data(path_data, index_schema)
-        off_data = load_image_data(path_off, index_schema, z_index=None)
-        avg_data = load_image_data(path_avg, index_schema, z_index=None)
+        image_data = load_image_data(path_data)
+        off_data = load_image_data(path_off, z_index=None)
+        avg_data = load_image_data(path_avg, z_index=None)
 
         # ensure all data matches the first file's resolution
-        if image_resolution[0] < 0:
-            image_resolution = (
-                image_data.shape[0], 
-                image_data.shape[1]
-            )
+        if image_resolution[-1] < 0:
+            image_resolution[-1] = image_data.shape[-1]
+            image_resolution[-2] = image_data.shape[-2]
+            
         elif (
-            image_resolution[0] != image_data.shape[0] or 
-            image_resolution[1] != image_data.shape[1] or
-            image_resolution[0] != off_data.shape[0] or
-            image_resolution[1] != off_data.shape[1] or
-            image_resolution[0] != avg_data.shape[0] or
-            image_resolution[1] != avg_data.shape[1] 
+            image_resolution[-1] != image_data.shape[-1] or 
+            image_resolution[-2] != image_data.shape[-2] or
+            image_resolution[-1] != off_data.shape[-1] or
+            image_resolution[-2] != off_data.shape[-2] or
+            image_resolution[-1] != avg_data.shape[-1] or
+            image_resolution[-2] != avg_data.shape[-2] 
         ): 
+            print(
+                image_resolution, 
+                image_data.shape, 
+                off_data.shape, 
+                avg_data.shape
+            )
             raise Exception(
                 f"Resolution mismatch for '{os.fspath(path_data), path_avg}'"
             )
@@ -224,10 +228,6 @@ def fits_file_process_iter(
         corrected_off_data = avg_data - off_data # this result should be disp - rdisp
         # swap the indices back around because we fucked up the order when 
         # writing the files
-        corrected_off_data = IndexSchema.convert(
-            corrected_off_data,
-            IndexSchema.XYT, IndexSchema.TYX
-        )
         # apod_window = processing.apod_mask(
         #     destr_params.kx, 
         #     destr_params.ky, 
@@ -250,7 +250,7 @@ def fits_file_process_iter(
             doreg(
                 image_data, 
                 rdisp,
-                rdisp + corrected_off_data,
+                rdisp - corrected_off_data,
                 destr_params
             ),
             None,
@@ -295,6 +295,9 @@ def destretch_files(
     out_name_digits: int = len(str(len(in_data_files)))
     index: int = 0
 
+    # to store output paths
+    out_paths: list[os.PathLike] | None = kwargs.get("out_paths", None)
+
     # ensure output directory exists
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
@@ -308,6 +311,8 @@ def destretch_files(
         out_num = f"{index:0{out_name_digits}}"
         out_path = os.path.join(out_dir, out_filename + f"{out_num}.fits")
         fits.writeto(out_path, result[0], overwrite=True)
+        print(f"destretched {out_path}")
+        if out_paths is not None: out_paths.append(out_path)
         index += 1
 
     # iterate through file datas and call iter_process on destretched results
@@ -360,6 +365,9 @@ def calc_offset_vectors(
     out_name_digits: int = len(str(len(in_filepaths)))
     index: int = 0
 
+    # to store output paths
+    out_paths: list[os.PathLike] | None = kwargs.get("out_paths", None)
+
     # ensure output directory exists
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
@@ -371,12 +379,12 @@ def calc_offset_vectors(
         # use final displacement sum 'disp_sum' - 'rdisp_sum'
         _, disp_sum, rdisp_sum, _ = result
         offsets = disp_sum - rdisp_sum
-        offsets = IndexSchema.convert(offsets, IndexSchema.TYX, IndexSchema.XYT)
 
         # output the vectors as a new fits file
         out_num = f"{index:0{out_name_digits}}"
         out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
         fits.writeto(out_path, offsets, overwrite=True)
+        if out_paths is not None: out_paths.append(out_path)
         index += 1
     
     # use default previousRef method if not specified
@@ -391,7 +399,8 @@ def calc_rolling_mean(
         out_filename: str = "offsets",
         margin_left: int = 5,
         margin_right: int = 5,
-        end_behavior: MarginEndBehavior = MarginEndBehavior.KEEP_RANGE
+        end_behavior: MarginEndBehavior = MarginEndBehavior.KEEP_RANGE,
+        ** kwargs: IterProcessArgs
     )-> None:
     """
     TODO this function needs to be revised, writing files at either end of 
@@ -425,6 +434,9 @@ def calc_rolling_mean(
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     
+    # to store output paths
+    out_paths: list[os.PathLike] | None = kwargs.get("out_paths", None)
+
     # data structures to store info about original datas
     file_count = len(in_filepaths)
     original_data: list[np.ndarray] = []
@@ -536,6 +548,7 @@ def calc_rolling_mean(
             )
             print(f"writing {out_path}..")
             fits.writeto(out_path, avg_data[0], overwrite=True)
+            if out_paths is not None: out_paths.append(out_path)
             index_written += 1
 
             # pop data if not last iteration, so we rewrite the same file
@@ -546,4 +559,4 @@ def calc_rolling_mean(
         index += 1
 
     # apply the defined function to each data frame
-    fits_file_iter(in_filepaths, iter_data, IndexSchema.XYT, None)
+    fits_file_iter(in_filepaths, iter_data, None, ** kwargs)

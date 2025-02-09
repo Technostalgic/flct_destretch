@@ -6,14 +6,14 @@ from typing import Callable
 from astropy.io import fits
 from matplotlib import cm
 
-import utility
+from utility import IndexSchema, load_image_data
 
 def fits_to_mp4(
         in_dir_path: os.PathLike | list[os.PathLike], 
         out_path: os.PathLike,
         fps: float = 24.0,
         color_map: str = "copper",
-        index_schema: utility.IndexSchema = utility.IndexSchema.XYT,
+        index_schema: IndexSchema = IndexSchema.TYX,
         relative_min: float = 0,
         relative_max: float = 1,
         normal_mode: bool = False,
@@ -73,7 +73,8 @@ def fits_to_mp4(
     for path in fits_files:
 
         # Open the FITS file and extract image data
-        data = utility.load_image_data(path, index_schema, z_index=None)
+        data = load_image_data(path, z_index=None)
+        data = IndexSchema.convert(data, index_schema, index_schema.XYT)
 
         ## TODO fix offsets increasing magnitude along y axis
         # if pixel_adjust_y:
@@ -92,7 +93,7 @@ def fits_to_mp4(
                     "normal_mode on, but data has dimensions not equal to 3"
                 )
                 continue
-            if data.shape[2] > 3 :
+            if data.shape[0] > 3 :
                 print(
                     f"Skipping {path}: " +
                     "Data has to manny z levels."
@@ -117,28 +118,31 @@ def fits_to_mp4(
 
             # separate rgb channels by data z slice
             shape = norm_data.shape
-            r = norm_data[:,:,0]
+            r = norm_data[0,:,:]
             g = (
-                np.zeros((shape[0], shape[1]))
-                    if shape[2] <= 1 else 
-                norm_data[:,:,1] 
+                np.zeros((shape[-2], shape[-1]))
+                    if shape[0] <= 1 else 
+                norm_data[1,:,:] 
             )
             b = (
-                np.zeros((shape[0], shape[1]))
-                    if shape[2] <= 2 else 
-                norm_data[:,:,2] 
+                np.zeros((shape[-2], shape[-1]))
+                    if shape[0] <= 2 else 
+                norm_data[2,:,:] 
             )
             
             # if no b channel, use it to show magnitude
-            if shape[2] <= 2:
-                b = (r ** 2 + b ** 2) ** .5
+            # if shape[0] <= 2:
+            #     b = (r ** 2 + b ** 2) ** .5
             
             # write rgb to frame
-            rgb = np.zeros((shape[0], shape[1], 3))
-            rgb[:,:,0] = r
-            rgb[:,:,1] = g
-            rgb[:,:,2] = b
-            frame = (rgb * 255.0).astype(np.uint8)
+            rgb = np.zeros((3, shape[-2], shape[-1]))
+            rgb[0,:,:] = r
+            rgb[1,:,:] = g
+            rgb[2,:,:] = b
+            frame = (
+                IndexSchema.convert(rgb, IndexSchema.TXY, IndexSchema.XYT) * 
+                255.0
+            ).astype(np.uint8)
             # print(data[frames_written * 90, 0, 1])
 
         # convert to BGR for video
