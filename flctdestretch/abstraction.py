@@ -125,6 +125,8 @@ def fits_file_destretch_iter(
         # get the reference image from the specified reference method
         reference_image = ref_method.get_reference(i)
 
+        print(f"ref image checksum: {reference_image.sum()}")
+
         # perform image destretching
         print(f"processing image #{i}.." + in_filepaths[i])
         result = reg_loop(
@@ -132,6 +134,10 @@ def fits_file_destretch_iter(
             reference_image,
             kernel_sizes,
         )
+
+        # ???? why does it change after the first time? why is the change 
+        # different than just ref -= ref.mean()? 
+        print(f"ref image checksum: {reference_image.sum()}")
 
         # call the function specified by caller
         iter_func(result)
@@ -167,9 +173,6 @@ def fits_file_process_iter(
 
     # used to enforce the same resolution for all data files
     image_resolution = [-1,-1]
-
-    # reference image to feed into next destretch loop
-    reference_image: np.ndarray | None = None
 
     # iterate through each file
     print("Searching for image data in specified files...")
@@ -217,6 +220,7 @@ def fits_file_process_iter(
         #     use_fft=True
         # )
 
+        image_data -= image_data.mean()
         destr_params, rdisp = destr_control_points(
             image_data,
             np.zeros((1,1)), # kernel?
@@ -250,7 +254,7 @@ def fits_file_process_iter(
             doreg(
                 image_data, 
                 rdisp,
-                rdisp - corrected_off_data,
+                rdisp - corrected_off_data * 2,
                 destr_params
             ),
             None,
