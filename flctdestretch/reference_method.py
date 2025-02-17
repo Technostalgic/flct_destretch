@@ -81,6 +81,31 @@ class MarginEndBehavior(enum.Enum):
     KEEP_RANGE: int = 0
     TRIM_MARGINS: int = 1
 
+    def wrap_margins(self, min: int, max: int, count: int) -> tuple[int, int, int]:
+        """
+        wraps a given margin on the specified count based on it's behavior
+        returns the new valid (min, max, range) range is the distance between
+        min and max
+        """
+        if min < 0 or max > count:
+            match self:
+                case MarginEndBehavior.KEEP_RANGE:
+                    margin_range = max - min
+                    if count < margin_range:
+                        min = 0
+                        max = count
+                    elif min < 0:
+                        min = 0
+                        max = margin_range
+                    elif max > count:
+                        max = count
+                        min = count - margin_range
+                case MarginEndBehavior.TRIM_MARGINS:
+                    min = max(0, min)
+                    max = min(count, max)
+        margin_range: int = max - min
+        return (min, max, margin_range)
+
 class OMargin(RefMethod):
     """
     A Reference Method which takes `self.margin_left` preceeding images of the 
@@ -184,3 +209,14 @@ class OMargin(RefMethod):
         if len(self.original_data) > local_index:
             return self.original_data[local_index]
         return None
+
+class RefFiles(RefMethod):
+
+    refpaths: list[os.PathLike]
+
+    def __init__(self, filepaths = [], refpaths = []):
+        super().__init__(filepaths)
+        self.refpaths = refpaths
+    
+    def get_reference(self, current_index):
+        return utility.load_image_data(self.refpaths[current_index])
