@@ -195,9 +195,11 @@ class RollingWindow(RefMethod):
                 self.original_data.append(data)
 
     def get_reference(self, current_index: int) -> np.ndarray:
+        self.process_index(current_index)
         return np.median(np.stack(self.original_data, axis=2), axis=2)
 
     def get_original_data(self, current_index) -> np.ndarray | None:
+        self.process_index(current_index)
         local_index = current_index - self.original_data_off
         if len(self.original_data) > local_index:
             return self.original_data[local_index]

@@ -69,11 +69,6 @@ def fits_file_destretch_iter(
     for i in range(len(in_filepaths)):
         path = in_filepaths[i]
         
-        # pass data to reference method so it can do its thing
-        match ref_method:
-            case RollingWindow():
-                ref_method.process_index(i)
-        
         # get the image data from ref method if available otherwise load it
         image_data: np.ndarray = ref_method.get_original_data(i)
         if image_data is None:
