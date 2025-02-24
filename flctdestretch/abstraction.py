@@ -72,7 +72,7 @@ def fits_file_destretch_iter(
         # pass data to reference method so it can do its thing
         match ref_method:
             case RollingWindow():
-                ref_method.pass_params(i)
+                ref_method.process_index(i)
         
         # get the image data from ref method if available otherwise load it
         image_data: np.ndarray = ref_method.get_original_data(i)
@@ -246,9 +246,9 @@ def fits_file_process_iter(
 def destretch_files(
         in_data_files: list[os.PathLike],
         in_off_files: list[os.PathLike],
-        in_avg_files: list[os.PathLike] | None,
         out_dir: os.PathLike,
         out_filename: str = "destretched",
+        in_avg_files: list[os.PathLike] | None = None,
         ** kwargs: IterProcessArgs
     ) -> None:
     """
@@ -299,8 +299,10 @@ def destretch_files(
 
     # iterate through file datas and call iter_process on destretched results
     fits_file_process_iter(
-        in_data_files, in_off_files, in_avg_files, 
+        in_data_files, 
+        in_off_files, 
         iter_process, 
+        in_avg_files=in_avg_files, 
         ** kwargs
     )
 
@@ -446,9 +448,9 @@ def calc_rolling_mean(
 
         # calculate the local margin values
         margin_min, margin_max = end_behavior.clamp(
+            file_count,
             index_avged - window_left, 
-            index_avged + window_right + 1, 
-            file_count
+            index_avged + window_right + 1
         )
         margin_range: int = margin_max - margin_min
         
@@ -463,12 +465,12 @@ def calc_rolling_mean(
             local_marg_min = margin_min - original_data_off
 
             # calculate the average from scratch if it doesn't exist yet
-            if data_avg is None:
-                data_avg = original_data[local_marg_min]
-                for i in range(local_marg_min + 1, local_marg_max):
-                    data_avg += original_data[i].copy()
-                data_avg /= margin_range
-                # data_avg = np.median(original_data[local_marg_min + 1 : local_marg_max], 0)
+            if data_avg is None or True:
+                # data_avg = original_data[local_marg_min]
+                # for i in range(local_marg_min + 1, local_marg_max):
+                #     data_avg += original_data[i].copy()
+                # data_avg /= margin_range
+                data_avg = np.median(np.array(original_data[local_marg_min + 1 : local_marg_max]), 0)
             
             # if it does exist, remove the preceding datas, and add the datas 
             # that need to be added

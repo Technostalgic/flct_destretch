@@ -17,23 +17,26 @@ class WindowEdgeBehavior(enum.Enum):
         Clamps (clamp = keep within range) min and max between 0 and max_range
         based on the specified edge behavior. Returns new valuse for min and max
         """
+        new_min = min
+        new_max = max
         if min < 0 or max > max_range:
             match self:
                 case WindowEdgeBehavior.KEEP_RANGE:
-                    margin_range = max - min
-                    if max_range < margin_range:
-                        min = 0
-                        max = max_range
+                    window_range = max - min
+                    if window_range < 0: window_range = 0
+                    if max_range < window_range:
+                        new_min = 0
+                        new_max = max_range
                     elif min < 0:
-                        min = 0
-                        max = margin_range
+                        new_min = 0
+                        new_max = window_range
                     elif max > max_range:
-                        max = max_range
-                        min = max_range - margin_range
+                        new_max = max_range
+                        new_min = max_range - window_range
                 case WindowEdgeBehavior.TRIM_MARGINS:
-                    min = max(0, min)
-                    max = min(max_range, max)
-        return (min, max)
+                    new_min = max(0, min)
+                    new_max = min(max_range, max)
+        return (new_min, new_max)
 
 ## Reference Method Definitions ------------------------------------------------
 
@@ -163,41 +166,25 @@ class RollingWindow(RefMethod):
         result.window_right = margin_right
         return result
 
-    def pass_params(self,
+    def process_index(self,
         current_index: int,
         original_image: np.ndarray = None
     ):
         # calculate the local margin values
-        margin_min = current_index - self.window_left
-        margin_max = current_index + self.window_right + 1
-        file_count = len(self.filepaths)
-        if margin_min < 0 or margin_max > file_count:
-            match self.edge_behavior:
-                case WindowEdgeBehavior.KEEP_RANGE:
-                    margin_range = margin_max - margin_min
-                    if file_count < margin_range:
-                        margin_min = 0
-                        margin_max = file_count
-                    elif margin_min < 0:
-                        margin_min = 0
-                        margin_max = margin_range
-                    elif margin_max > file_count:
-                        margin_max = file_count
-                        margin_min = file_count - margin_range
-                        pass
-                case WindowEdgeBehavior.TRIM_MARGINS:
-                    margin_min = max(0, margin_min)
-                    margin_max = min(file_count, margin_max)
-                    pass
+        window_min, window_max = self.edge_behavior.clamp(
+            len(self.filepaths),
+            current_index - self.window_left, 
+            current_index + self.window_right + 1
+        )
         
         # remove image datas who are no longer needed
-        off_increment = margin_min - self.original_data_off
-        self.original_data_off = margin_min
+        off_increment = window_min - self.original_data_off
+        self.original_data_off = window_min
         for _ in range(off_increment):
             self.original_data.pop(0)
 
         # iterate through each index in the margin
-        for i in range(margin_min, margin_max):
+        for i in range(window_min, window_max):
             local_index = i - self.original_data_off
             if local_index >= len(self.original_data):
                 data: np.ndarray = None
