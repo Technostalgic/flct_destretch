@@ -12,7 +12,7 @@ from astropy.io import fits
 import abstraction
 from utility import IndexSchema, get_fits_paths
 from examples.fits_to_mp4 import fits_to_mp4
-from reference_method import OMargin
+from reference_method import RollingWindow
 
 ## Fetch Data ------------------------------------------------------------------
 
@@ -69,7 +69,7 @@ result = abstraction.destretch_files(
     out_dir,
     kernel_sizes=kernel_sizes,
     index_schema=IndexSchema.XY,
-    ref_method=OMargin(files, 10, 10)
+    ref_method=RollingWindow(files, 10, 10)
 )
 
 out_file_orig_vid = os.path.join(files_dir, "video_original.mp4")

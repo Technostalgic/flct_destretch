@@ -1,4 +1,3 @@
-import enum
 import os
 import time
 from typing import Callable, TypedDict, Any
@@ -10,9 +9,10 @@ from algorithm import (
     doreg, destr_control_points, reg_loop,
     DestretchLoopResult, DestretchParams
 )
-import processing
 from utility import IndexSchema, load_image_data
-from reference_method import RefMethod, OMargin, PreviousRef, MarginEndBehavior
+from reference_method import RefMethod, RollingWindow, PreviousRef, WindowEdgeBehavior
+
+## Utility Types ---------------------------------------------------------------
 
 class IterProcessArgs(TypedDict):
     """
@@ -32,6 +32,8 @@ class IterProcessArgs(TypedDict):
     index_schema: IndexSchema
     ref_method: RefMethod
     out_paths: list[os.PathLike]
+
+## Utility Funcs ---------------------------------------------------------------
 
 def fits_file_destretch_iter(
         in_filepaths: list[os.PathLike],
@@ -54,7 +56,7 @@ def fits_file_destretch_iter(
 
     # get required kwargs or default values if not specified
     kernel_sizes: list[int] = kwargs.get("kernel_sizes", [64, 32])
-    ref_method: RefMethod = kwargs.get("ref_method", OMargin(in_filepaths))
+    ref_method: RefMethod = kwargs.get("ref_method", RollingWindow(in_filepaths))
 
     # used to enforce the same resolution for all data files
     image_resolution = [-1,-1]
@@ -69,7 +71,7 @@ def fits_file_destretch_iter(
         
         # pass data to reference method so it can do its thing
         match ref_method:
-            case OMargin():
+            case RollingWindow():
                 ref_method.pass_params(i)
         
         # get the image data from ref method if available otherwise load it
@@ -116,8 +118,8 @@ def fits_file_destretch_iter(
 def fits_file_process_iter(
         in_data_files: list[os.PathLike],
         in_off_files: list[os.PathLike],
-        in_avg_files: list[os.PathLike] | None,
         iter_func: Callable[[DestretchLoopResult], None],
+        in_avg_files: list[os.PathLike] | None = None,
         ** kwargs: IterProcessArgs
     ) -> None:
     """
@@ -238,6 +240,8 @@ def fits_file_process_iter(
 
         # call the function specified by caller
         iter_func(result)
+
+## Module Funcitonality --------------------------------------------------------
 
 def destretch_files(
         in_data_files: list[os.PathLike],
@@ -377,7 +381,7 @@ def calc_rolling_mean(
         out_filename: str = "offsets",
         window_left: int = 5,
         window_right: int = 5,
-        end_behavior: MarginEndBehavior = MarginEndBehavior.KEEP_RANGE,
+        end_behavior: WindowEdgeBehavior = WindowEdgeBehavior.KEEP_RANGE,
         ** kwargs: IterProcessArgs
     )-> None:
     """
@@ -397,9 +401,9 @@ def calc_rolling_mean(
         the directory where the offset vector files will be stored
     out_filename:
         the base name of each file (numbers will be appended to the end of them)
-    margin_left:
+    window_left:
         number of images before current image to include in ref margin
-    margin_right:
+    window_right:
         number of images after current image to include in ref margin
     end_behavior:
         how the function decides what data to use for the margin when it 
@@ -441,7 +445,7 @@ def calc_rolling_mean(
         print(f"averaging data #{index}..")
 
         # calculate the local margin values
-        margin_min, margin_max = end_behavior.get_margin_range(
+        margin_min, margin_max = end_behavior.clamp(
             index_avged - window_left, 
             index_avged + window_right + 1, 
             file_count
