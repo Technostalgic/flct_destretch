@@ -33,35 +33,6 @@ class IterProcessArgs(TypedDict):
     ref_method: RefMethod
     out_paths: list[os.PathLike]
 
-def fits_file_iter(
-        in_filepaths: list[os.PathLike],
-        iter_func: Callable[[np.ndarray], None],
-        z_index: int | None = 0,
-        ** kwargs
-    ) -> None:
-    """
-    iterates over each data from each specified file calling the specified 
-    iter_func and passing the fits file data to that funciton
-
-    Parameters
-    ----------
-    in_filepaths:
-        the list of file paths to process
-    iter_func:
-        the function that is called for each frame after the image data has 
-        been processed it
-    z_index:
-        th z index slice to use in the image data if it is 3d data file (after 
-        converted from index schema). Set to None if you want the image data to 
-        remain as 3d
-    """
-    # iterate through each file data 
-    print("Searching for image data in specified files...")
-    for i in range(len(in_filepaths)):
-        path = in_filepaths[i]
-        image_data = load_image_data(path, z_index=z_index)
-        iter_func(image_data)
-
 def fits_file_destretch_iter(
         in_filepaths: list[os.PathLike],
         iter_func: Callable[[DestretchLoopResult], None],
@@ -115,7 +86,7 @@ def fits_file_destretch_iter(
         elif (
             image_resolution[-1] != image_data.shape[-1] or 
             image_resolution[-2] != image_data.shape[-2]
-        ): 
+        ):
             print(image_resolution, image_data.shape)
             raise Exception(f"Resolution mismatch for '{os.fspath(path)}'")
 
@@ -145,7 +116,7 @@ def fits_file_destretch_iter(
 def fits_file_process_iter(
         in_data_files: list[os.PathLike],
         in_off_files: list[os.PathLike],
-        in_avg_files: list[os.PathLike],
+        in_avg_files: list[os.PathLike] | None,
         iter_func: Callable[[DestretchLoopResult], None],
         ** kwargs: IterProcessArgs
     ) -> None:
@@ -179,12 +150,12 @@ def fits_file_process_iter(
     for i in range(len(in_data_files)):
         path_data = in_data_files[i]
         path_off = in_off_files[i]
-        path_avg = in_avg_files[i]
+        path_avg = None if in_avg_files is None else in_avg_files[i]
         
         # get the image data from ref method if available otherwise load it
         image_data = load_image_data(path_data)
         off_data = load_image_data(path_off, z_index=None)
-        avg_data = load_image_data(path_avg, z_index=None)
+        avg_data = None if path_avg is None else load_image_data(path_avg, z_index=None)
 
         # ensure all data matches the first file's resolution
         if image_resolution[-1] < 0:
@@ -196,8 +167,8 @@ def fits_file_process_iter(
             image_resolution[-2] != image_data.shape[-2] or
             image_resolution[-1] != off_data.shape[-1] or
             image_resolution[-2] != off_data.shape[-2] or
-            image_resolution[-1] != avg_data.shape[-1] or
-            image_resolution[-2] != avg_data.shape[-2] 
+            (False if avg_data is None else image_resolution[-1] != avg_data.shape[-1]) or
+            (False if avg_data is None else image_resolution[-2] != avg_data.shape[-2])
         ): 
             print(
                 image_resolution, 
@@ -229,7 +200,10 @@ def fits_file_process_iter(
         )
 
         # calculate the corrected result
-        corrected_off_data = avg_data - off_data # this result should be disp - rdisp
+
+        # this result should be disp - rdisp
+        corrected_off_data = -off_data if avg_data is None else avg_data - off_data 
+        
         # swap the indices back around because we fucked up the order when 
         # writing the files
         # apod_window = processing.apod_mask(
@@ -268,7 +242,7 @@ def fits_file_process_iter(
 def destretch_files(
         in_data_files: list[os.PathLike],
         in_off_files: list[os.PathLike],
-        in_avg_files: list[os.PathLike],
+        in_avg_files: list[os.PathLike] | None,
         out_dir: os.PathLike,
         out_filename: str = "destretched",
         ** kwargs: IterProcessArgs
@@ -401,8 +375,8 @@ def calc_rolling_mean(
         in_filepaths: list[os.PathLike],
         out_dir: os.PathLike,
         out_filename: str = "offsets",
-        margin_left: int = 5,
-        margin_right: int = 5,
+        window_left: int = 5,
+        window_right: int = 5,
         end_behavior: MarginEndBehavior = MarginEndBehavior.KEEP_RANGE,
         ** kwargs: IterProcessArgs
     )-> None:
@@ -460,31 +434,18 @@ def calc_rolling_mean(
     data_avg_range: int = 0
 
     # define the local function that iterates over each data frame
-    def iter_data(data: np.ndarray):
-        nonlocal data_avg, data_avg_start, data_avg_end, data_avg_range
-        nonlocal index, index_written, index_avged, original_data_off
+    for i in range(len(in_filepaths)):
+        path = in_filepaths[i]
+        data = load_image_data(path, z_index=None)
 
         print(f"averaging data #{index}..")
 
         # calculate the local margin values
-        margin_min = index_avged - margin_left
-        margin_max = index_avged + margin_right + 1
-        if margin_min < 0 or margin_max > file_count:
-            match end_behavior:
-                case MarginEndBehavior.KEEP_RANGE:
-                    margin_range = margin_max - margin_min
-                    if file_count < margin_range:
-                        margin_min = 0
-                        margin_max = file_count
-                    elif margin_min < 0:
-                        margin_min = 0
-                        margin_max = margin_range
-                    elif margin_max > file_count:
-                        margin_max = file_count
-                        margin_min = file_count - margin_range
-                case MarginEndBehavior.TRIM_MARGINS:
-                    margin_min = max(0, margin_min)
-                    margin_max = min(file_count, margin_max)
+        margin_min, margin_max = end_behavior.get_margin_range(
+            index_avged - window_left, 
+            index_avged + window_right + 1, 
+            file_count
+        )
         margin_range: int = margin_max - margin_min
         
         # append current data to data list
@@ -498,12 +459,12 @@ def calc_rolling_mean(
             local_marg_min = margin_min - original_data_off
 
             # calculate the average from scratch if it doesn't exist yet
-            if data_avg is None or True:
-                # data_avg = original_data[local_marg_min]
-                # for i in range(local_marg_min + 1, local_marg_max):
-                #     data_avg += original_data[i].copy()
-                # data_avg /= margin_range
-                data_avg = np.median(original_data[local_marg_min + 1 : local_marg_max], 0)
+            if data_avg is None:
+                data_avg = original_data[local_marg_min]
+                for i in range(local_marg_min + 1, local_marg_max):
+                    data_avg += original_data[i].copy()
+                data_avg /= margin_range
+                # data_avg = np.median(original_data[local_marg_min + 1 : local_marg_max], 0)
             
             # if it does exist, remove the preceding datas, and add the datas 
             # that need to be added
@@ -561,6 +522,3 @@ def calc_rolling_mean(
                 avg_data.pop(0)
 
         index += 1
-
-    # apply the defined function to each data frame
-    fits_file_iter(in_filepaths, iter_data, None, ** kwargs)

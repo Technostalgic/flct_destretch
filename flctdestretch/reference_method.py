@@ -81,6 +81,26 @@ class MarginEndBehavior(enum.Enum):
     KEEP_RANGE: int = 0
     TRIM_MARGINS: int = 1
 
+    def get_margin_range(self, max_range: int, min: int, max: int) -> tuple[int, int]:
+        if min < 0 or max > max_range:
+            match self:
+                case MarginEndBehavior.KEEP_RANGE:
+                    margin_range = max - min
+                    if max_range < margin_range:
+                        min = 0
+                        max = max_range
+                    elif min < 0:
+                        min = 0
+                        max = margin_range
+                    elif max > max_range:
+                        max = max_range
+                        min = max_range - margin_range
+                case MarginEndBehavior.TRIM_MARGINS:
+                    min = max(0, min)
+                    max = min(max_range, max)
+        return (min, max)
+
+
 class OMargin(RefMethod):
     """
     A Reference Method which takes `self.margin_left` preceeding images of the 
