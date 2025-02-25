@@ -31,7 +31,6 @@ class IterProcessArgs(TypedDict):
     kernel_sizes: list[int]
     index_schema: IndexSchema
     ref_method: RefMethod
-    out_paths: list[os.PathLike]
 
 ## Utility Funcs ---------------------------------------------------------------
 
@@ -225,7 +224,7 @@ def fits_file_process_iter(
             doreg(
                 image_data, 
                 rdisp,
-                rdisp - corrected_off_data * 2,
+                rdisp - corrected_off_data,
                 destr_params
             ),
             None,
@@ -245,7 +244,7 @@ def destretch_files(
         out_filename: str = "destretched",
         in_avg_files: list[os.PathLike] | None = None,
         ** kwargs: IterProcessArgs
-    ) -> None:
+    ) -> list[os.PathLike]:
     """
     Compute the destretched result of data from all given files, and export to 
     new files
@@ -265,15 +264,14 @@ def destretch_files(
         see IterProcessArgs class for all available arguments
     """
 
+    out_paths: list[os.PathLike] = []
+
     # start timing 
     time_begin = time.time()
 
     # number of digits needed to accurately order the output files
     out_name_digits: int = len(str(len(in_data_files)))
     index: int = 0
-
-    # to store output paths
-    out_paths: list[os.PathLike] | None = kwargs.get("out_paths", None)
 
     # ensure output directory exists
     if not os.path.exists(out_dir):
@@ -288,8 +286,8 @@ def destretch_files(
         out_num = f"{index:0{out_name_digits}}"
         out_path = os.path.join(out_dir, out_filename + f"{out_num}.fits")
         fits.writeto(out_path, result[0], overwrite=True)
+        out_paths.append(out_path)
         print(f"destretched {out_path}")
-        if out_paths is not None: out_paths.append(out_path)
         index += 1
 
     # iterate through file datas and call iter_process on destretched results
@@ -317,13 +315,14 @@ def destretch_files(
         "Destretching complete! Time elapsed: " +
         f"{time_taken:.3f} {time_units}"
     )
+    return out_paths
 
 def calc_offset_vectors(
         in_filepaths: list[os.PathLike],
         out_dir: os.PathLike,
         out_filename: str = "offsets",
         ** kwargs: IterProcessArgs
-    ) -> None:
+    ) -> list[os.PathLike]:
     """
     calcuates the offset vectors from destretching and outputs each of them as 
     .fits files
@@ -340,12 +339,11 @@ def calc_offset_vectors(
         see IterProcessArgs class for all available arguments
     """
 
+    out_paths: list[os.PathLike] = []
+
     # number of digits needed to accurately order the output files
     out_name_digits: int = len(str(len(in_filepaths)))
     index: int = 0
-
-    # to store output paths
-    out_paths: list[os.PathLike] | None = kwargs.get("out_paths", None)
 
     # ensure output directory exists
     if not os.path.exists(out_dir):
@@ -363,7 +361,7 @@ def calc_offset_vectors(
         out_num = f"{index:0{out_name_digits}}"
         out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
         fits.writeto(out_path, offsets, overwrite=True)
-        if out_paths is not None: out_paths.append(out_path)
+        out_paths.append(out_path)
         index += 1
     
     # use default previousRef method if not specified
@@ -371,6 +369,7 @@ def calc_offset_vectors(
 
     # iterate over data in files
     fits_file_destretch_iter(in_filepaths, process_iter, ** kwargs)
+    return out_paths
 
 def calc_rolling_mean(
         in_filepaths: list[os.PathLike],
@@ -380,7 +379,7 @@ def calc_rolling_mean(
         window_right: int = 5,
         end_behavior: WindowEdgeBehavior = WindowEdgeBehavior.KEEP_RANGE,
         ** kwargs: IterProcessArgs
-    )-> None:
+    )-> list[os.PathLike]:
     """
     TODO this function needs to be revised, writing files at either end of 
     margin seems to not work properly
@@ -409,12 +408,12 @@ def calc_rolling_mean(
         see IterProcessArgs class for all available arguments
     """
 
+    # store output paths to return
+    out_paths: list[os.PathLike] = []
+
     # ensure output directory exists
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
-    
-    # to store output paths
-    out_paths: list[os.PathLike] | None = kwargs.get("out_paths", None)
 
     # data structures to store info about original datas
     file_count = len(in_filepaths)
@@ -514,7 +513,7 @@ def calc_rolling_mean(
             )
             print(f"writing {out_path}..")
             fits.writeto(out_path, avg_data[0], overwrite=True)
-            if out_paths is not None: out_paths.append(out_path)
+            out_paths.append(out_path)
             index_written += 1
 
             # pop data if not last iteration, so we rewrite the same file
@@ -523,3 +522,5 @@ def calc_rolling_mean(
                 avg_data.pop(0)
 
         index += 1
+
+    return out_paths
