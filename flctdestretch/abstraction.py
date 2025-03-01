@@ -224,7 +224,7 @@ def fits_file_process_iter(
             doreg(
                 image_data, 
                 rdisp,
-                rdisp - corrected_off_data,
+                rdisp - corrected_off_data * 2,
                 destr_params
             ),
             None,

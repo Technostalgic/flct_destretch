@@ -6,6 +6,8 @@ import numpy as np
 import astropy.io.fits as fits
 from astropy.io.fits.hdu import HDUList, ImageHDU, CompImageHDU
 
+fits_regex = re.compile("^.*\.fits$")
+
 class IndexSchema(enum.Enum):
     """
     Represents an index schema for an np.ndarray, showing which index in the 
@@ -124,11 +126,14 @@ def load_image_data(
     
     return image_data
 
-fits_regex = re.compile("^.*\.fits$")
-
-def get_fits_paths(in_dir: os.PathLike) -> list[str]:
-    return [
+def get_fits_paths(in_dir: os.PathLike, sort: bool = True) -> list[str]:
+    """
+    gets all the paths to the fits files in a directory. By default, sorted a-z
+    """
+    paths = [
         os.path.join(in_dir, filename)
         for filename in os.listdir(in_dir)
         if fits_regex.match(filename)
     ]
+    if sort: paths.sort()
+    return paths
