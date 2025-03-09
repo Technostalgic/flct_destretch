@@ -187,7 +187,7 @@ def fits_file_process_iter(
         #     use_fft=True
         # )
 
-        image_data -= image_data.mean()
+        #image_data -= image_data.mean()
         destr_params, rdisp = destr_control_points(
             image_data,
             np.zeros((1,1)), # kernel?
@@ -459,12 +459,12 @@ def calc_rolling_mean(
             local_marg_min = margin_min - original_data_off
 
             # calculate the average from scratch if it doesn't exist yet
-            if data_avg is None or True:
-                # data_avg = original_data[local_marg_min]
-                # for i in range(local_marg_min + 1, local_marg_max):
-                #     data_avg += original_data[i].copy()
-                # data_avg /= margin_range
-                data_avg = np.median(np.array(original_data[local_marg_min + 1 : local_marg_max]), 0)
+            if data_avg is None:
+                data_avg = original_data[local_marg_min]
+                for i in range(local_marg_min + 1, local_marg_max):
+                    data_avg += original_data[i].copy()
+                data_avg /= margin_range
+                # data_avg = np.median(np.array(original_data[local_marg_min + 1 : local_marg_max]), 0)
             
             # if it does exist, remove the preceding datas, and add the datas 
             # that need to be added
