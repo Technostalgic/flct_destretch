@@ -15,14 +15,14 @@ def write_frame(
     data_min: float, 
     normal_mode: bool = False
 ) -> None:
-    
+
     #ensure data is 2D
     if not normal_mode and (data is None or data.ndim != 2):
         return
     if normal_mode:
         if data.ndim != 3:
             return
-        if data.shape[0] > 3:
+        if data.shape[2] > 3:
             return
     
     # normalize the data to 8-bit range (0-255) for visualization
@@ -34,25 +34,25 @@ def write_frame(
 
         # separate rgb channels by data z slice
         shape = norm_data.shape
-        r = norm_data[0,:,:]
+        r = norm_data[:,:,0]
         g = (
-            np.zeros((shape[-2], shape[-1]))
-                if shape[0] <= 1 else 
-            norm_data[1,:,:] 
+            np.zeros((shape[0], shape[1]))
+                if shape[2] <= 1 else 
+            norm_data[:,:,1] 
         )
         b = (
-            np.zeros((shape[-2], shape[-1]))
-                if shape[0] <= 2 else 
-            norm_data[2,:,:] 
+            np.zeros((shape[0], shape[1]))
+                if shape[2] <= 2 else 
+            norm_data[:,:,2] 
         )
         
         # write rgb to frame
-        rgb = np.zeros((3, shape[-2], shape[-1]))
-        rgb[0,:,:] = r
-        rgb[1,:,:] = g
-        rgb[2,:,:] = b
+        rgb = np.zeros((shape[0], shape[1], 3))
+        rgb[:,:,0] = r
+        rgb[:,:,1] = g
+        rgb[:,:,2] = b
         frame = (
-            IndexSchema.convert(rgb, IndexSchema.TXY, IndexSchema.XYT) * 
+            IndexSchema.convert(rgb, IndexSchema.XYT, IndexSchema.XYT) * 
             255.0
         ).astype(np.uint8)
     else:
@@ -148,7 +148,11 @@ def fits_to_mp4(
     """
 
     # grab a test frame to initialize some data
-    test_data = load_image_data(in_files[-1], z_index=None)
+    test_data = IndexSchema.convert(
+        load_image_data(in_files[-1], z_index=None), 
+        index_schema,
+        index_schema.XYT
+    )
 
     # Initialize video writer
     height, width = test_data.shape[:2]
