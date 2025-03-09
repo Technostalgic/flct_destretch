@@ -45,6 +45,9 @@ class RefMethod(abc.ABC):
     Data structure to define how the reference image in the destretching 
     algorithm is defined or calculated - abstract class
     """
+    
+    filepaths: list[os.PathLike] = []
+
     def __init__(self, filepaths: list[os.PathLike] = []):
         """
         Do not use this - instead use the static 'create' method
@@ -55,7 +58,7 @@ class RefMethod(abc.ABC):
             list of paths to be destretched
         """
         super().__init__()
-        self.filepaths: list[os.PathLike] = filepaths
+        self.filepaths = filepaths
 
     @abc.abstractmethod
     def get_reference(self, current_index: int) -> np.ndarray:
@@ -110,6 +113,21 @@ class PreviousRef(RefMethod):
         self.cur_data = None
 
         return reference_data
+
+class ExternalRefs(RefMethod):
+    """
+    A reference method that references additoinal files to use as reference 
+    images for destretching
+    """
+
+    ref_paths: list[os.PathLike] = []
+
+    def __init__(self, filepaths = [], ref_paths = []):
+        super().__init__(filepaths)
+        self.ref_paths = ref_paths
+    
+    def get_reference(self, current_index) -> np.ndarray:
+        return load_image_data(self.ref_paths[current_index])
 
 class RollingWindow(RefMethod):
     """
