@@ -7,7 +7,7 @@ from astropy.io import fits
 
 from algorithm import (
     doreg, destr_control_points, reg_loop,
-    DestretchLoopResult, DestretchParams
+    DestretchLoopResult
 )
 from utility import IndexSchema, load_image_data
 from reference_method import RefMethod, RollingWindow, PreviousRef, WindowEdgeBehavior
@@ -310,7 +310,7 @@ def destretch_files(
             time_taken /= 60
             time_units = "hours"
     
-    # output time elapsed
+    # output time
     print(
         "Destretching complete! Time elapsed: " +
         f"{time_taken:.3f} {time_units}"

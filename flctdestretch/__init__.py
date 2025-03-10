@@ -2,6 +2,6 @@
 TODO
 """
 
-from .destretch_params import *
+from .destretch_types import *
 from .algorithm import *
 from .abstraction import *
