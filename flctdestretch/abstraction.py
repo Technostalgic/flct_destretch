@@ -434,11 +434,10 @@ def calc_rolling_mean(
     data_avg_range: int = 0
 
     # define the local function that iterates over each data frame
-    for i in range(len(in_filepaths)):
-        path = in_filepaths[i]
-        data = load_image_data(path, z_index=None)
-
-        print(f"averaging data #{index}..")
+    iter_count: int = file_count + window_right
+    for i0 in range(iter_count):
+        path: str | None = None if i0 >= file_count else in_filepaths[i0]
+        data: np.ndarray | None = None if path is None else load_image_data(path, z_index=None)
 
         # calculate the local margin values
         margin_min, margin_max = end_behavior.clamp(
@@ -449,9 +448,9 @@ def calc_rolling_mean(
         margin_range: int = margin_max - margin_min
         
         # append current data to data list
-        local_index = index - original_data_off
-        if local_index >= len(original_data):
-            original_data.append(data)
+        if data is not None:
+            if index - original_data_off >= len(original_data):
+                original_data.append(data)
         
         # if the entire margin is within the data list
         local_marg_max = margin_max - original_data_off
@@ -461,8 +460,8 @@ def calc_rolling_mean(
             # calculate the average from scratch if it doesn't exist yet
             if data_avg is None:
                 data_avg = original_data[local_marg_min]
-                for i in range(local_marg_min + 1, local_marg_max):
-                    data_avg += original_data[i].copy()
+                for i1 in range(local_marg_min + 1, local_marg_max):
+                    data_avg += original_data[i1].copy()
                 data_avg /= margin_range
                 # data_avg = np.median(np.array(original_data[local_marg_min + 1 : local_marg_max]), 0)
             
@@ -471,8 +470,8 @@ def calc_rolling_mean(
             else:
                 # remove all preceding datas from average
                 local_avg_start = data_avg_start - original_data_off
-                for i in range(local_avg_start, local_marg_min):
-                    data_avg -= original_data[i] / data_avg_range
+                for i1 in range(local_avg_start, local_marg_min):
+                    data_avg -= original_data[i1] / data_avg_range
 
                 # adjust current avg weight to new range if changed
                 local_avg_end = data_avg_end - original_data_off
@@ -489,8 +488,9 @@ def calc_rolling_mean(
                     data_avg *= avg_weight_numerator
 
                 # add new datas to average
-                for i in range(local_avg_end, local_marg_max):
-                    data_avg += original_data[i] / margin_range
+                for i1 in range(local_avg_end, local_marg_max):
+                    data_avg += original_data[i1] / margin_range
+
             
             # remove unneeded datas from beginning of data list
             for _ in range(local_marg_min):
@@ -501,8 +501,8 @@ def calc_rolling_mean(
             data_avg_start = margin_min
             data_avg_end = margin_max
             data_avg_range = margin_range
+            avg_data.append(data_avg.copy())
             index_avged += 1
-            avg_data.append(data_avg)
 
         # output the averaged vectors as a new fits file
         while len(avg_data) > 0:
@@ -511,14 +511,13 @@ def calc_rolling_mean(
                 out_dir, 
                 out_filename + f"{out_num}.avg.fits"
             )
-            print(f"writing {out_path}..")
             fits.writeto(out_path, avg_data[0], overwrite=True)
             out_paths.append(out_path)
             index_written += 1
 
             # pop data if not last iteration, so we rewrite the same file
             # multiple times at the end according to margin settings
-            if not(index == file_count - 1 and index_written <= index):
+            if not(index == iter_count - 1 and index_written <= index - window_right):
                 avg_data.pop(0)
 
         index += 1

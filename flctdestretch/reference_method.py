@@ -12,30 +12,30 @@ class WindowEdgeBehavior(enum.Enum):
     KEEP_RANGE: int = 0
     TRIM_MARGINS: int = 1
 
-    def clamp(self, max_range: int, min: int, max: int) -> tuple[int, int]:
+    def clamp(self, max_range: int, minval: int, maxval: int) -> tuple[int, int]:
         """
         Clamps (clamp = keep within range) min and max between 0 and max_range
         based on the specified edge behavior. Returns new valuse for min and max
         """
-        new_min = min
-        new_max = max
-        if min < 0 or max > max_range:
+        new_min = minval
+        new_max = maxval
+        if minval < 0 or maxval > max_range:
             match self:
                 case WindowEdgeBehavior.KEEP_RANGE:
-                    window_range = max - min
+                    window_range = maxval - minval
                     if window_range < 0: window_range = 0
                     if max_range < window_range:
                         new_min = 0
                         new_max = max_range
-                    elif min < 0:
+                    elif minval < 0:
                         new_min = 0
                         new_max = window_range
-                    elif max > max_range:
+                    elif maxval > max_range:
                         new_max = max_range
                         new_min = max_range - window_range
                 case WindowEdgeBehavior.TRIM_MARGINS:
-                    new_min = max(0, min)
-                    new_max = min(max_range, max)
+                    new_min = max(0, minval)
+                    new_max = min(max_range, maxval)
         return (new_min, new_max)
 
 ## Reference Method Definitions ------------------------------------------------
