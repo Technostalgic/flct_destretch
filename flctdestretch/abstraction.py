@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Callable, TypedDict, Any
+from typing import Callable, TypedDict, Any, Union
 
 import numpy as np
 from astropy.io import fits
@@ -234,6 +234,30 @@ def fits_file_process_iter(
 
         # call the function specified by caller
         iter_func(result)
+
+def write_sequential_file(
+    index: int, 
+    digits: int, 
+    out_dir: str, 
+    base_name: str,
+    data: np.ndarray
+) -> os.PathLike:
+    out_num = f"{index:0{digits}}"
+    out_path = os.path.join(
+        out_dir, 
+        base_name + f"{out_num}.avg.fits"
+    )
+    fits.writeto(out_path, data, overwrite=True)
+    return out_path
+
+def get_filepaths_info(
+    in_filepaths: list[os.PathLike]
+) -> tuple[int, int, Union[int, tuple[int, ...]]]:
+    
+    file_count = len(in_filepaths)
+    out_name_digits: int = len(str(file_count))
+    image_resolution = load_image_data(in_filepaths[-1], z_index=None).shape
+    return (file_count, out_name_digits, image_resolution)
 
 ## Module Funcitonality --------------------------------------------------------
 
@@ -524,3 +548,99 @@ def calc_rolling_mean(
         index += 1
 
     return out_paths
+# Sum from window left to right (
+#   Sum from start to current iteration(
+#       
+#   )
+# ) +
+# Sum from window left to right (
+#   Sum from start to current iteration (
+#       offsets from previous iteration to current iteration
+#   )
+# )
+
+def calc_cumulative_sums(
+    in_filepaths: list[os.PathLike],
+    out_dir: os.PathLike,
+    out_filename: str = "cumulative_off"
+) -> list[os.PathLike]:
+    
+    # meta info from files
+    (file_count, out_name_digits, image_resolution) = get_filepaths_info(in_filepaths)
+    paths: list[os.PathLike] = []
+
+    # ensure output directory exists
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    # iterate from 0 to index at each iteration, and sum all data from the start to nth iteration
+    for index0 in range(file_count):
+
+        # sum all data from 0 to iteration
+        data_sum = np.zeros(image_resolution)
+        for index1 in range(index0):
+            data = load_image_data(in_filepaths[index1], z_index=None)
+            data_sum += data
+        
+        # write file and append path to output
+        path = write_sequential_file(index0, out_name_digits, out_dir, out_filename, data_sum)
+        paths.append(path)
+
+    return paths
+
+def calc_difs(
+    in_filepaths1: list[os.PathLike],
+    in_filepaths2: list[os.PathLike],
+    out_dir: os.PathLike,
+    out_filename: str = "dif"
+) -> list[os.PathLike]:
+    
+    # meta info from files
+    (file_count, out_name_digits, image_resolution) = get_filepaths_info(in_filepaths1)
+    paths: list[os.PathLike] = []
+
+    # ensure output directory exists
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    for index in range(file_count):
+        data_a = load_image_data(in_filepaths1[index], z_index=None)
+        data_b = load_image_data(in_filepaths2[index], z_index=None)
+        write_sequential_file(index, out_name_digits, out_dir, out_filename, data_a - data_b)
+
+def calc_rolling_sum(
+    in_filepaths: list[os.PathLike],
+    out_dir: os.PathLike,
+    out_filename: str = "rolling_sum",
+    window_left: int = 5,
+    window_right: int = 5,
+    end_behavior: WindowEdgeBehavior = WindowEdgeBehavior.KEEP_RANGE
+) -> list[os.PathLike]:
+    
+    # meta info from files
+    (file_count, out_name_digits, image_resolution) = get_filepaths_info(in_filepaths)
+    paths: list[os.PathLike] = []
+
+    # ensure output directory exists
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    for index0 in range(file_count):
+        data_sum = np.zeros(image_resolution)
+        (local_left, local_right) = end_behavior.clamp(
+            file_count, 
+            index0 - window_left, 
+            index0 + window_right
+        )
+        local_range = float(local_right - local_left)
+
+        # TODO optimize; we are re-loading the same files multiple times in this loop
+        for index1 in range(local_left, local_right):
+            filepath = in_filepaths[index1]
+            data = load_image_data(filepath, z_index=None)
+            data_sum += data / local_range
+        
+        path = write_sequential_file(index0, out_name_digits, out_dir, out_filename, data_sum)
+        paths.append(path)
+    
+    return paths
