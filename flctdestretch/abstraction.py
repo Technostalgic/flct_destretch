@@ -536,7 +536,7 @@ def calc_difs(
     out_filename: str = "dif"
 ) -> list[os.PathLike]:
     """
-    Subtract the data in in_filepaths1 from the data in in_filepaths2, store 
+    Subtract the data in in_filepaths2 from the data in in_filepaths1, store 
     results at specified directory and filename
     """
     
