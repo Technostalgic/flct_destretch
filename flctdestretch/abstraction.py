@@ -548,16 +548,6 @@ def calc_rolling_mean(
         index += 1
 
     return out_paths
-# Sum from window left to right (
-#   Sum from start to current iteration(
-#       
-#   )
-# ) +
-# Sum from window left to right (
-#   Sum from start to current iteration (
-#       offsets from previous iteration to current iteration
-#   )
-# )
 
 def calc_cumulative_sums(
     in_filepaths: list[os.PathLike],
@@ -573,12 +563,13 @@ def calc_cumulative_sums(
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
+    # TODO optimize; we are reloading the same files many times in each loop
     # iterate from 0 to index at each iteration, and sum all data from the start to nth iteration
     for index0 in range(file_count):
 
         # sum all data from 0 to iteration
         data_sum = np.zeros(image_resolution)
-        for index1 in range(index0):
+        for index1 in range(index0 + 1):
             data = load_image_data(in_filepaths[index1], z_index=None)
             data_sum += data
         
