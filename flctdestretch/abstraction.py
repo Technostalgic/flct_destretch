@@ -57,8 +57,8 @@ def fits_file_destretch_iter(
     kernel_sizes: list[int] = kwargs.get("kernel_sizes", [64, 32])
     ref_method: RefMethod = kwargs.get("ref_method", RollingWindow(in_filepaths))
 
-    # used to enforce the same resolution for all data files
-    image_resolution = [-1,-1]
+    # meta info from files
+    (_, _, image_resolution) = get_filepaths_info(in_filepaths)
 
     # reference image to feed into next destretch loop
     reference_image: np.ndarray | None = None
@@ -74,12 +74,7 @@ def fits_file_destretch_iter(
             image_data = load_image_data(path)
 
         # ensure all data matches the first file's resolution
-        if image_resolution[-1] < 0:
-            image_resolution = (
-                image_data.shape[-1], 
-                image_data.shape[-2]
-            )
-        elif (
+        if (
             image_resolution[-1] != image_data.shape[-1] or 
             image_resolution[-2] != image_data.shape[-2]
         ):
@@ -138,9 +133,9 @@ def fits_file_process_iter(
     if(len(in_data_files) != len(in_off_files)):
         raise Exception("Each data file must have a corresponging offset")
 
-    # used to enforce the same resolution for all data files
-    image_resolution = [-1,-1]
-
+    # meta info from files
+    (_, _, image_resolution) = get_filepaths_info(in_data_files)
+    
     # iterate through each file
     print("Searching for image data in specified files...")
     for i in range(len(in_data_files)):
@@ -154,11 +149,7 @@ def fits_file_process_iter(
         avg_data = None if path_avg is None else load_image_data(path_avg, z_index=None)
 
         # ensure all data matches the first file's resolution
-        if image_resolution[-1] < 0:
-            image_resolution[-1] = image_data.shape[-1]
-            image_resolution[-2] = image_data.shape[-2]
-            
-        elif (
+        if (
             image_resolution[-1] != image_data.shape[-1] or 
             image_resolution[-2] != image_data.shape[-2] or
             image_resolution[-1] != off_data.shape[-1] or
@@ -176,18 +167,8 @@ def fits_file_process_iter(
                 f"Resolution mismatch for '{os.fspath(path_data), path_avg}'"
             )
 
-
-        # # perform image destretching
-        # print(f"processing image #{i}.." + in_data_files[i])
-        # result = reg_loop(
-        #     image_data,
-        #     reference_image,
-        #     kernel_sizes,
-        #     mf=0.08,
-        #     use_fft=True
-        # )
-
-        #image_data -= image_data.mean()
+        # generate destretch and reference displacement vectors based on offsets that we know 
+        # have a 1:1 kernel:pixel scale
         destr_params, rdisp = destr_control_points(
             image_data,
             np.zeros((1,1)), # kernel?
@@ -195,31 +176,8 @@ def fits_file_process_iter(
             spacing_ratio=0 # should be defailt?
         )
 
-        # calculate the corrected result
-
-        # this result should be disp - rdisp
+        # invert the offset data and apply it as a correction to destretch the original image
         corrected_off_data = -off_data if avg_data is None else avg_data - off_data 
-        
-        # swap the indices back around because we fucked up the order when 
-        # writing the files
-        # apod_window = processing.apod_mask(
-        #     destr_params.kx, 
-        #     destr_params.ky, 
-        #     destr_params.mf
-        # )
-        # subfield_fftconj, _ = doref(
-        #     ref, # why do we need reference here? (we shouldn't)
-        #     apod_window, 
-        #     destr_params
-        # )
-        # # fft
-        # disp = controlpoint_offsets_fft(
-        #     image_data, 
-        #     subfield_fftconj, # problematic
-        #     apod_window, 
-        #     processing.smouth(destr_params.kx, destr_params.ky), 
-        #     destr_params
-        # )
         result = (
             doreg(
                 image_data, 
@@ -398,7 +356,7 @@ def calc_offset_vectors(
 def calc_rolling_mean(
         in_filepaths: list[os.PathLike],
         out_dir: os.PathLike,
-        out_filename: str = "offsets",
+        out_filename: str = "avg",
         window_left: int = 5,
         window_right: int = 5,
         end_behavior: WindowEdgeBehavior = WindowEdgeBehavior.KEEP_RANGE,
@@ -447,7 +405,6 @@ def calc_rolling_mean(
 
     # number of digits needed to accurately order the output files
     out_name_digits: int = len(str(file_count))
-    index: int = 0
     index_avged: int = 0
     index_written: int = 0
 
@@ -473,7 +430,7 @@ def calc_rolling_mean(
         
         # append current data to data list
         if data is not None:
-            if index - original_data_off >= len(original_data):
+            if i0 - original_data_off >= len(original_data):
                 original_data.append(data)
         
         # if the entire margin is within the data list
@@ -487,7 +444,6 @@ def calc_rolling_mean(
                 for i1 in range(local_marg_min + 1, local_marg_max):
                     data_avg += original_data[i1].copy()
                 data_avg /= margin_range
-                # data_avg = np.median(np.array(original_data[local_marg_min + 1 : local_marg_max]), 0)
             
             # if it does exist, remove the preceding datas, and add the datas 
             # that need to be added
@@ -515,7 +471,6 @@ def calc_rolling_mean(
                 for i1 in range(local_avg_end, local_marg_max):
                     data_avg += original_data[i1] / margin_range
 
-            
             # remove unneeded datas from beginning of data list
             for _ in range(local_marg_min):
                 original_data.pop(0)
@@ -533,19 +488,16 @@ def calc_rolling_mean(
             out_num = f"{index_written:0{out_name_digits}}"
             out_path = os.path.join(
                 out_dir, 
-                out_filename + f"{out_num}.avg.fits"
+                out_filename + f"{out_num}.fits"
             )
-            print(f"writing {out_path}..")
             fits.writeto(out_path, avg_data[0], overwrite=True)
             out_paths.append(out_path)
             index_written += 1
 
             # pop data if not last iteration, so we rewrite the same file
             # multiple times at the end according to margin settings
-            if not(index == iter_count - 1 and index_written <= index - window_right):
+            if not(i0 == iter_count - 1 and index_written <= i0 - window_right):
                 avg_data.pop(0)
-
-        index += 1
 
     return out_paths
 
@@ -563,15 +515,13 @@ def calc_cumulative_sums(
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    # TODO optimize; we are reloading the same files many times in each loop
     # iterate from 0 to index at each iteration, and sum all data from the start to nth iteration
+    data_sum = np.zeros(image_resolution)
     for index0 in range(file_count):
 
-        # sum all data from 0 to iteration
-        data_sum = np.zeros(image_resolution)
-        for index1 in range(index0 + 1):
-            data = load_image_data(in_filepaths[index1], z_index=None)
-            data_sum += data
+        # sum all data from 0 to iteration by adding it to our last data_sum
+        data = load_image_data(in_filepaths[index0], z_index=None)
+        data_sum += data
         
         # write file and append path to output
         path = write_sequential_file(index0, out_name_digits, out_dir, out_filename, data_sum)
@@ -585,6 +535,10 @@ def calc_difs(
     out_dir: os.PathLike,
     out_filename: str = "dif"
 ) -> list[os.PathLike]:
+    """
+    Subtract the data in in_filepaths1 from the data in in_filepaths2, store 
+    results at specified directory and filename
+    """
     
     # meta info from files
     (file_count, out_name_digits, image_resolution) = get_filepaths_info(in_filepaths1)
@@ -598,40 +552,3 @@ def calc_difs(
         data_a = load_image_data(in_filepaths1[index], z_index=None)
         data_b = load_image_data(in_filepaths2[index], z_index=None)
         write_sequential_file(index, out_name_digits, out_dir, out_filename, data_a - data_b)
-
-def calc_rolling_sum(
-    in_filepaths: list[os.PathLike],
-    out_dir: os.PathLike,
-    out_filename: str = "rolling_sum",
-    window_left: int = 5,
-    window_right: int = 5,
-    end_behavior: WindowEdgeBehavior = WindowEdgeBehavior.KEEP_RANGE
-) -> list[os.PathLike]:
-    
-    # meta info from files
-    (file_count, out_name_digits, image_resolution) = get_filepaths_info(in_filepaths)
-    paths: list[os.PathLike] = []
-
-    # ensure output directory exists
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-
-    for index0 in range(file_count):
-        data_sum = np.zeros(image_resolution)
-        (local_left, local_right) = end_behavior.clamp(
-            file_count, 
-            index0 - window_left, 
-            index0 + window_right
-        )
-        local_range = float(local_right - local_left)
-
-        # TODO optimize; we are re-loading the same files multiple times in this loop
-        for index1 in range(local_left, local_right):
-            filepath = in_filepaths[index1]
-            data = load_image_data(filepath, z_index=None)
-            data_sum += data / local_range
-        
-        path = write_sequential_file(index0, out_name_digits, out_dir, out_filename, data_sum)
-        paths.append(path)
-    
-    return paths
