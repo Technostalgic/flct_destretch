@@ -1,7 +1,9 @@
 import os
 import cv2
 import numpy as np
+import math
 from typing import Callable
+
 
 from matplotlib import cm
 
@@ -149,7 +151,7 @@ def fits_to_mp4(
 
     # grab a test frame to initialize some data
     test_data = IndexSchema.convert(
-        load_image_data(in_files[-1], z_index=None), 
+        load_image_data(in_files[math.floor(len(in_files) * .5)], z_index=None), 
         index_schema,
         index_schema.XYT
     )
