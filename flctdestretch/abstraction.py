@@ -552,3 +552,46 @@ def calc_difs(
         data_a = load_image_data(in_filepaths1[index], z_index=None)
         data_b = load_image_data(in_filepaths2[index], z_index=None)
         write_sequential_file(index, out_name_digits, out_dir, out_filename, data_a - data_b)
+
+def calc_change_rate(
+    in_filepaths: list[os.PathLike],
+    out_dir: os.PathLike,
+    out_filename: str = "flow",
+    window_size: int = 5,
+    end_behavior: WindowEdgeBehavior = WindowEdgeBehavior.KEEP_RANGE
+) -> list[os.PathLike]:
+    """
+    Calculate the rate of change between intervals of window_size in the 
+    specified data files, and output the results as new files in the 
+    specified directory
+    """
+
+    # meta info from files
+    (file_count, out_name_digits, _) = get_filepaths_info(in_filepaths)
+
+    # ensure output directory exists
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    
+    # keep track of loaded files so we do not have to load each of them twice
+    loaded_data: list[np.ndarray] = []
+    loaded_data_off: int = 0
+
+    # calculate rate at each step and write to file
+    for i in range(file_count):
+        imin, imax = end_behavior.clamp(file_count, i - window_size, i + window_size + 1)
+        irange = imax - imin
+
+        # unload datas we do not need any more
+        while imin > loaded_data_off:
+            loaded_data.pop(0)
+            loaded_data_off += 1
+
+        # load datas up to imax
+        while irange > len(loaded_data):
+            index = imin + len(loaded_data)
+            loaded_data.append(load_image_data(in_filepaths[index], z_index=None))
+        
+        # write flow to data file
+        flow = loaded_data[-1] - loaded_data[0]
+        write_sequential_file(i, out_name_digits, out_dir, out_filename, flow)
