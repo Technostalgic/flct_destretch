@@ -696,6 +696,10 @@ def reg_loop(
         rdisp_sum    += dispmap_new - offsets_new
         kernel_count += 1
 
+    # destr_info.kx , ky - kernel size
+    # use this, alongside spacing_ratio and border_size to reduce the 
+    # resolution of the displacement maps
+
     # the displacement maps contain the pixel reference coordinates, so 
     # adding them iteratively sums those reference coordinates
     # divide by the number of maps summed to get back to the rate coordinates

@@ -87,8 +87,6 @@ def fits_file_destretch_iter(
         # get the reference image from the specified reference method
         reference_image = ref_method.get_reference(i)
 
-        print(f"ref image checksum: {reference_image.sum()}")
-
         # perform image destretching
         print(f"processing image #{i}.." + in_filepaths[i])
         result = reg_loop(
@@ -96,10 +94,6 @@ def fits_file_destretch_iter(
             reference_image,
             kernel_sizes,
         )
-
-        # ???? why does it change after the first time? why is the change 
-        # different than just ref -= ref.mean()? 
-        print(f"ref image checksum: {reference_image.sum()}")
 
         # call the function specified by caller
         iter_func(result)
