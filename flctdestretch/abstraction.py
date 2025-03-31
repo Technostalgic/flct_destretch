@@ -89,14 +89,28 @@ def fits_file_destretch_iter(
 
         # perform image destretching
         print(f"processing image #{i}.." + in_filepaths[i])
+        spacing_ratio: float = 0.5
+        border_offset: int = 4
         result = reg_loop(
             image_data,
             reference_image,
             kernel_sizes,
+            border_offset=border_offset,
+            spacing_ratio=spacing_ratio
         )
 
-        # call the function specified by caller
-        iter_func(result)
+        _, control_points = destr_control_points(
+            result, 
+            (result.destr_info.kx, result.des.ky),
+            border_offset, spacing_ratio
+        )
+
+        for x_index in control_points[0, :, 0]:
+            for y_index in control_points[0, 0, :]:
+                # this should give you the coordinate of the control point at 
+                # the x index and y index
+                point = control_points[:, x_index, y_index]
+                print(point)
 
 def fits_file_process_iter(
         in_data_files: list[os.PathLike],
