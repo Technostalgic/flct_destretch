@@ -27,10 +27,18 @@ class IterProcessArgs(TypedDict):
     ref_method : reference_method.RefMethod
         the method to use to apply the reference image for destretching, if not
         specified, will use reference_method.OMargin in most cases
+    spacing_ratio : float
+        how far apart each subwindow is placed, in terms of a ratio to the 
+        window_size
+    border_offset : int
+        how many pixels from each side of the image should not be included in
+        destretching
     """
     kernel_sizes: list[int]
     index_schema: IndexSchema
     ref_method: RefMethod
+    spacing_ratio: float
+    border_offset: int
 
 ## Utility Funcs ---------------------------------------------------------------
 
@@ -56,6 +64,8 @@ def fits_file_destretch_iter(
     # get required kwargs or default values if not specified
     kernel_sizes: list[int] = kwargs.get("kernel_sizes", [64, 32])
     ref_method: RefMethod = kwargs.get("ref_method", RollingWindow(in_filepaths))
+    spacing_ratio: float = kwargs.get("spacing_ratio", 0.5)
+    border_offset: int = kwargs.get("border_offset", 4)
 
     # meta info from files
     (_, _, image_resolution) = get_filepaths_info(in_filepaths)
@@ -89,8 +99,6 @@ def fits_file_destretch_iter(
 
         # perform image destretching
         print(f"processing image #{i}.." + in_filepaths[i])
-        spacing_ratio: float = 0.5
-        border_offset: int = 4
         result = reg_loop(
             image_data,
             reference_image,
@@ -100,8 +108,8 @@ def fits_file_destretch_iter(
         )
 
         _, control_points = destr_control_points(
-            result, 
-            (result.destr_info.kx, result.des.ky),
+            result,
+            (result.destr_info.kx, result.destr_info.ky),
             border_offset, spacing_ratio
         )
 
