@@ -1,8 +1,8 @@
-import os
-import time
+import os, time
 from typing import Callable, TypedDict, Any, Union
 
 import numpy as np
+from scipy.ndimage import map_coordinates
 from astropy.io import fits
 
 from algorithm import (
@@ -39,6 +39,7 @@ class IterProcessArgs(TypedDict):
     ref_method: RefMethod
     spacing_ratio: float
     border_offset: int
+    optimize_filesize: bool
 
 ## Utility Funcs ---------------------------------------------------------------
 
@@ -66,6 +67,7 @@ def fits_file_destretch_iter(
     ref_method: RefMethod = kwargs.get("ref_method", RollingWindow(in_filepaths))
     spacing_ratio: float = kwargs.get("spacing_ratio", 0.5)
     border_offset: int = kwargs.get("border_offset", 4)
+    optimize_filesize: bool = kwargs.get("optimize_filesize", True)
 
     # meta info from files
     (_, _, image_resolution) = get_filepaths_info(in_filepaths)
@@ -107,18 +109,43 @@ def fits_file_destretch_iter(
             spacing_ratio=spacing_ratio
         )
 
-        _, control_points = destr_control_points(
-            result,
-            (result.destr_info.kx, result.destr_info.ky),
-            border_offset, spacing_ratio
-        )
+        # this introduces a non-insignificant computational overhead since we 
+        # need to iterate over every control point
+        if optimize_filesize:
 
-        for x_index in control_points[0, :, 0]:
-            for y_index in control_points[0, 0, :]:
-                # this should give you the coordinate of the control point at 
-                # the x index and y index
-                point = control_points[:, x_index, y_index]
-                print(point)
+            # get control points
+            kernel = np.zeros((result.destr_info.kx, result.destr_info.ky))
+            _, control_points = destr_control_points(
+                result.result, kernel,
+                border_offset, spacing_ratio
+            )
+
+            # 
+            cp_shape = control_points.shape
+            result_reduced = np.zeros((cp_shape[1], cp_shape[2]))
+            disp_sum_reduced = np.zeros((2, cp_shape[1], cp_shape[2]))
+            ref_disp_sum_reduced = np.zeros(disp_sum_reduced.shape)
+            for x_index in range(len(control_points[0, :, 0])):
+                for y_index in range(len(control_points[0, 0, :])):
+                    # this should give you the coordinate of the control point at 
+                    # the x index and y index
+                    # TODO verify the xy axes are not mixed up
+                    x = int(control_points[0, x_index, y_index])
+                    y = int(control_points[1, x_index, y_index])
+                    result_reduced[x_index, y_index] = result.result[x, y]
+                    disp_sum_reduced[:, x_index, y_index] = result.displace_sum[:, x,y]
+                    ref_disp_sum_reduced[:, x_index, y_index] = result.ref_displace_sum[:, x,y]
+            
+            # apply reduced data to result
+            result = DestretchLoopResult(
+                result_reduced, 
+                disp_sum_reduced, 
+                ref_disp_sum_reduced, 
+                result.destr_info
+            )
+        
+        # call the function passed by caller
+        iter_func(result)
 
 def fits_file_process_iter(
         in_data_files: list[os.PathLike],
@@ -147,7 +174,7 @@ def fits_file_process_iter(
 
     # ensure there is an offset for each data
     if(len(in_data_files) != len(in_off_files)):
-        raise Exception("Each data file must have a corresponging offset")
+        raise Exception("Each data file must have a corresponding offset")
 
     # meta info from files
     (_, _, image_resolution) = get_filepaths_info(in_data_files)
@@ -159,10 +186,18 @@ def fits_file_process_iter(
         path_off = in_off_files[i]
         path_avg = None if in_avg_files is None else in_avg_files[i]
         
-        # get the image data from ref method if available otherwise load it
+        # get the image datas
         image_data = load_image_data(path_data)
         off_data = load_image_data(path_off, z_index=None)
         avg_data = None if path_avg is None else load_image_data(path_avg, z_index=None)
+
+        if (
+            image_resolution[-1] != off_data.shape[-1] or 
+            image_resolution[-2] != off_data.shape[-2] 
+        ):
+            upsize_factor = image_resolution[-1] / off_data.shape[-1]
+            print(f"upscaling offset data by a factor of {upsize_factor}")
+            off_data = resize_vector_map(off_data, upsize_factor)
 
         # ensure all data matches the first file's resolution
         if (
@@ -172,12 +207,12 @@ def fits_file_process_iter(
             image_resolution[-2] != off_data.shape[-2] or
             (False if avg_data is None else image_resolution[-1] != avg_data.shape[-1]) or
             (False if avg_data is None else image_resolution[-2] != avg_data.shape[-2])
-        ): 
+        ):
             print(
                 image_resolution, 
                 image_data.shape, 
                 off_data.shape, 
-                avg_data.shape
+                None if avg_data is None else avg_data.shape
             )
             raise Exception(
                 f"Resolution mismatch for '{os.fspath(path_data), path_avg}'"
@@ -232,6 +267,32 @@ def get_filepaths_info(
     out_name_digits: int = len(str(file_count))
     image_resolution = load_image_data(in_filepaths[-1], z_index=None).shape
     return (file_count, out_name_digits, image_resolution)
+
+def resize_vector_map(
+    data_in: np.ndarray, 
+    factor: np.ndarray, 
+) -> np.ndarray:
+    
+    axis_x: int = -1
+    axis_y: int = -2
+    out_size_x = int(round(data_in.shape[axis_x] * factor))
+    out_size_y = int(round(data_in.shape[axis_y] * factor))
+
+    rows = np.linspace(0, data_in.shape[axis_x] - 1, out_size_x)
+    cols = np.linspace(0, data_in.shape[axis_y] - 1, out_size_y)
+
+    grid_x, grid_y = np.meshgrid(rows, cols)
+    coords = np.array([grid_y.ravel(), grid_x.ravel()])
+
+    return np.stack([
+        map_coordinates(
+            data_in[ax], 
+            coords, 
+            order=1, 
+            mode='nearest'
+        ).reshape(out_size_x, out_size_y)
+        for ax in range(data_in.shape[0])
+    ])
 
 ## Module Funcitonality --------------------------------------------------------
 
