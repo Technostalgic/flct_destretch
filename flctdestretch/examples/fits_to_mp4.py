@@ -7,6 +7,7 @@ from typing import Callable
 
 from matplotlib import cm
 
+from abstraction import resize_vector_map
 from utility import IndexSchema, load_image_data
 
 def write_frame(
@@ -60,7 +61,7 @@ def write_frame(
         ).astype(np.uint8)
     else:
         frame = (map_rgb(norm_data) * 255.0).astype(np.uint8)
-    
+
     # convert to BGR for video
     frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
@@ -76,6 +77,7 @@ def data_to_mp4(
     relative_min: float = 0,
     relative_max: float = 1,
     normal_mode: bool = False,
+    scale_factor: float = 1.0,
 ) -> None:
 
     # grab a test frame to initialize some data
@@ -104,7 +106,15 @@ def data_to_mp4(
 
     # write each data as a frame in the video
     for data in datas:
-        written = write_frame(data, video_writer, map, data_range, data_min, normal_mode)
+        written = write_frame(
+            data, 
+            video_writer, 
+            map, 
+            data_range, 
+            data_min, 
+            normal_mode, 
+            scale_factor
+        )
         if written: frames_written += 1
 
     # Release the video writer to save the video
@@ -123,7 +133,8 @@ def fits_to_mp4(
     relative_min: float = 0,
     relative_max: float = 1,
     normal_mode: bool = False,
-    z_index: int | None = None
+    z_index: int | None = None,
+    scale_factor: float = 1.0,
 ) -> None:
     """
     convert a directory of .fits files into an mp4 video
@@ -153,11 +164,10 @@ def fits_to_mp4(
     """
 
     # grab a test frame to initialize some data
-    test_data = IndexSchema.convert(
-        load_image_data(in_files[math.floor(len(in_files) * .5)], z_index=z_index), 
-        index_schema,
-        index_schema.XYT
-    )
+    test_data = load_image_data(in_files[math.floor(len(in_files) * .5)], z_index=z_index)
+    # TODO apply scale factor in write_frame instead of here
+    if scale_factor != 1.0: test_data = resize_vector_map(test_data, scale_factor)
+    test_data = IndexSchema.convert(test_data, index_schema, IndexSchema.XYT)
 
     # Initialize video writer
     height, width = test_data.shape[:2]
@@ -184,9 +194,20 @@ def fits_to_mp4(
 
         # Open the FITS file and extract image data
         data = load_image_data(path, z_index=z_index)
-        data = IndexSchema.convert(data, index_schema, index_schema.XYT)
 
-        written = write_frame(data, video_writer, map, data_range, data_min, normal_mode)
+        # TODO apply scale factor in write_frame instead of here
+        if scale_factor != 1.0: data = resize_vector_map(data, scale_factor)
+
+        data = IndexSchema.convert(data, index_schema, index_schema.XYT)
+        written = write_frame(
+            data, 
+            video_writer, 
+            map, 
+            data_range, 
+            data_min, 
+            normal_mode,
+            scale_factor
+        )
         if written: frames_written += 1
 
     # Release the video writer
