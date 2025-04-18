@@ -15,17 +15,18 @@ def write_frame(
     map_rgb: Callable | None, 
     data_range: float, 
     data_min: float, 
-    normal_mode: bool = False
-) -> None:
+    normal_mode: bool = False,
+    scale_factor: float = 1.0
+) -> bool:
 
     #ensure data is 2D
     if not normal_mode and (data is None or data.ndim != 2):
-        return
+        return False
     if normal_mode:
         if data.ndim != 3:
-            return
+            return False
         if data.shape[2] > 3:
-            return
+            return False
     
     # normalize the data to 8-bit range (0-255) for visualization
     norm_data = np.clip((data - data_min) / data_range, 0, 1)
@@ -65,6 +66,7 @@ def write_frame(
 
     # Write the frame to the video
     video_writer.write(frame_bgr)
+    return True
 
 def data_to_mp4(
     datas: list[np.ndarray],
@@ -102,8 +104,8 @@ def data_to_mp4(
 
     # write each data as a frame in the video
     for data in datas:
-        write_frame(data, video_writer, map, data_range, data_min, normal_mode)
-        frames_written += 1
+        written = write_frame(data, video_writer, map, data_range, data_min, normal_mode)
+        if written: frames_written += 1
 
     # Release the video writer to save the video
     if frames_written > 0:
@@ -121,6 +123,7 @@ def fits_to_mp4(
     relative_min: float = 0,
     relative_max: float = 1,
     normal_mode: bool = False,
+    z_index: int | None = None
 ) -> None:
     """
     convert a directory of .fits files into an mp4 video
@@ -151,7 +154,7 @@ def fits_to_mp4(
 
     # grab a test frame to initialize some data
     test_data = IndexSchema.convert(
-        load_image_data(in_files[math.floor(len(in_files) * .5)], z_index=None), 
+        load_image_data(in_files[math.floor(len(in_files) * .5)], z_index=z_index), 
         index_schema,
         index_schema.XYT
     )
@@ -180,11 +183,11 @@ def fits_to_mp4(
     for path in in_files:
 
         # Open the FITS file and extract image data
-        data = load_image_data(path, z_index=None)
+        data = load_image_data(path, z_index=z_index)
         data = IndexSchema.convert(data, index_schema, index_schema.XYT)
-        
-        write_frame(data, video_writer, map, data_range, data_min, normal_mode)
-        frames_written += 1
+
+        written = write_frame(data, video_writer, map, data_range, data_min, normal_mode)
+        if written: frames_written += 1
 
     # Release the video writer
     if video_writer is not None:

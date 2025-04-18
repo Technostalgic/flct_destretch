@@ -40,6 +40,7 @@ class IterProcessArgs(TypedDict):
     spacing_ratio: float
     border_offset: int
     optimize_filesize: bool
+    start_at: int
 
 ## Utility Funcs ---------------------------------------------------------------
 
@@ -68,6 +69,7 @@ def fits_file_destretch_iter(
     spacing_ratio: float = kwargs.get("spacing_ratio", 0.5)
     border_offset: int = kwargs.get("border_offset", 4)
     optimize_filesize: bool = kwargs.get("optimize_filesize", True)
+    start_at: int = kwargs.get("start_at", 0)
 
     # meta info from files
     (_, _, image_resolution) = get_filepaths_info(in_filepaths)
@@ -77,7 +79,7 @@ def fits_file_destretch_iter(
 
     # iterate through each file
     print("Searching for image data in specified files...")
-    for i in range(len(in_filepaths)):
+    for i in range(start_at, len(in_filepaths)):
         path = in_filepaths[i]
         
         # get the image data from ref method if available otherwise load it
@@ -171,6 +173,7 @@ def fits_file_process_iter(
     # get required kwargs or default values if not specified
     kernel_sizes: list[int] = kwargs.get("kernel_sizes", [64, 32])
     index_schema: IndexSchema = kwargs.get("index_schema", IndexSchema.XYT)
+    start_at: int = kwargs.get("start_at", 0)
 
     # ensure there is an offset for each data
     if(len(in_data_files) != len(in_off_files)):
@@ -181,7 +184,7 @@ def fits_file_process_iter(
     
     # iterate through each file
     print("Searching for image data in specified files...")
-    for i in range(len(in_data_files)):
+    for i in range(start_at, len(in_data_files)):
         path_data = in_data_files[i]
         path_off = in_off_files[i]
         path_avg = None if in_avg_files is None else in_avg_files[i]
@@ -324,13 +327,14 @@ def destretch_files(
     """
 
     out_paths: list[os.PathLike] = []
+    start_at: int = kwargs.get("start_at", 0)
 
     # start timing 
     time_begin = time.time()
 
     # number of digits needed to accurately order the output files
     out_name_digits: int = len(str(len(in_data_files)))
-    index: int = 0
+    index: int = start_at
 
     # ensure output directory exists
     if not os.path.exists(out_dir):
@@ -398,11 +402,12 @@ def calc_offset_vectors(
         see IterProcessArgs class for all available arguments
     """
 
+    start_at: int = kwargs.get("start_at", 0)
     out_paths: list[os.PathLike] = []
 
     # number of digits needed to accurately order the output files
     out_name_digits: int = len(str(len(in_filepaths)))
-    index: int = 0
+    index: int = start_at
 
     # ensure output directory exists
     if not os.path.exists(out_dir):
