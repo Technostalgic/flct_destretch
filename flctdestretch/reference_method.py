@@ -4,7 +4,7 @@ import enum
 
 import numpy as np
 
-from utility import IndexSchema, load_image_data
+from .utility import IndexSchema, load_image_data
 
 ## Utility Types ---------------------------------------------------------------
 
