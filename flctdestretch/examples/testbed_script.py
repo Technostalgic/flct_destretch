@@ -56,18 +56,21 @@ elapsed = time.time() - start
 print(f"elapsed time: {elapsed}")
 
 # calculate the cumulative sum offsets
+print(f"calculating cumulative sums... {out_sum_dir}")
 calc_cumulative_sums(
     get_fits_paths(out_off_dir),
     out_sum_dir
 )
 
 # calculate the rolling sums of the cumulative sum offsets
+print(f"calculating tolling mean... {out_rolling_sum_dir}")
 calc_rolling_mean(
     get_fits_paths(out_sum_dir),
     out_rolling_sum_dir
 )
 
 # calculate the difs
+print(f"calculating final offs... {out_off_final_dir}")
 calc_difs(
     get_fits_paths(out_sum_dir),
     get_fits_paths(out_rolling_sum_dir),
@@ -76,11 +79,14 @@ calc_difs(
 )
 
 # calculate the flowmap
+print(f"generating flow map data... {out_flow_dir}")
 calc_change_rate(
     get_fits_paths(out_rolling_sum_dir),
     out_flow_dir
 )
+
 # apply the final offset vectors to destretch the image data
+print(f"generating destretched image data... {out_dir}")
 result = destretch_files(
 	files,
 	get_fits_paths(out_off_final_dir),
@@ -88,12 +94,3 @@ result = destretch_files(
 	"destr",
 	#in_avg_files=get_fits_paths(out_avg_dir),
 )
-
-# apply the control offset vectors to destretch the image data, this should 
-# result in the destretched imagees that we know are correct
-#abstraction.destretch_files(
-#	files,
-#	get_fits_paths(out_off_control_dir),
-#	out_dir_control,
-#	"destr_control"
-#)

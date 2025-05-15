@@ -2,6 +2,10 @@
 __pycache__/
 *.pyc
 
+# environments
+.venv/
+testenv/
+
 # post-build distribution package
 dist/
 
