@@ -34,7 +34,6 @@ start_index: int = 0
 # filepaths for output files
 out_off_dir = os.path.join(files_dir, "off")
 out_sum_dir = os.path.join(files_dir, "sum")
-out_rolling_sum_dir = os.path.join(files_dir, "rolling_sum")
 out_off_control_dir = os.path.join(files_dir, "off_control")
 out_avg_dir = os.path.join(files_dir, "avg")
 out_flow_dir = os.path.join(files_dir, "flow")
@@ -65,10 +64,10 @@ calc_cumulative_sums(
 )
 
 # calculate the rolling sums of the cumulative sum offsets
-print(f"calculating rolling mean... {out_rolling_sum_dir}")
+print(f"calculating rolling mean... {out_avg_dir}")
 calc_rolling_mean(
     get_fits_paths(out_sum_dir),
-    out_rolling_sum_dir,
+    out_avg_dir,
     window_left=rolling_mean_window_size,
     window_right=rolling_mean_window_size,
     start_at=start_index,
@@ -78,7 +77,7 @@ calc_rolling_mean(
 print(f"calculating final offs... {out_off_final_dir}")
 calc_difs(
     get_fits_paths(out_sum_dir),
-    get_fits_paths(out_rolling_sum_dir),
+    get_fits_paths(out_avg_dir),
     out_off_final_dir,
     "final",
     start_at=start_index,
@@ -87,7 +86,7 @@ calc_difs(
 # calculate the flowmap
 print(f"generating flow map data... {out_flow_dir}")
 calc_change_rate(
-    get_fits_paths(out_rolling_sum_dir),
+    get_fits_paths(out_avg_dir),
     out_flow_dir,
     window_size=flowmap_window_size,
     start_at=start_index,
@@ -100,7 +99,6 @@ result = destretch_files(
 	get_fits_paths(out_off_final_dir),
 	out_dir,
 	"destr",
-	#in_avg_files=get_fits_paths(out_avg_dir),
     start_at=start_index,
 )
 
