@@ -25,6 +25,12 @@ kernel_sizes: np.ndarray[np.int64] = np.array([128, 64])
 rolling_mean_window_size: int = 5
 flowmap_window_size: int = 5
 
+# in case it fails partway through destretching, you can set this to start at 
+# the nth file, where n is the index of the last file that was successfully 
+# destretched. naming conventions with offset indices will remain consistent 
+# with previously destretched files, so you can always pick up where you left off.
+start_index: int = 0 
+
 # filepaths for output files
 out_off_dir = os.path.join(files_dir, "off")
 out_sum_dir = os.path.join(files_dir, "sum")
@@ -47,14 +53,15 @@ calc_offset_vectors(
 	out_off_dir,
 	"off",
 	kernel_sizes=kernel_sizes,
-	# ref_method=ExternalRefs(files, get_fits_paths(out_ref_dir))
+    start_at=start_index,
 )
 
 # calculate the cumulative sum offsets
 print(f"calculating cumulative sums... {out_sum_dir}")
 calc_cumulative_sums(
     get_fits_paths(out_off_dir),
-    out_sum_dir
+    out_sum_dir,
+    start_at=start_index,
 )
 
 # calculate the rolling sums of the cumulative sum offsets
@@ -63,7 +70,8 @@ calc_rolling_mean(
     get_fits_paths(out_sum_dir),
     out_rolling_sum_dir,
     window_left=rolling_mean_window_size,
-    window_right=rolling_mean_window_size
+    window_right=rolling_mean_window_size,
+    start_at=start_index,
 )
 
 # calculate the difs
@@ -72,7 +80,8 @@ calc_difs(
     get_fits_paths(out_sum_dir),
     get_fits_paths(out_rolling_sum_dir),
     out_off_final_dir,
-    "final"
+    "final",
+    start_at=start_index,
 )
 
 # calculate the flowmap
@@ -81,6 +90,7 @@ calc_change_rate(
     get_fits_paths(out_rolling_sum_dir),
     out_flow_dir,
     window_size=flowmap_window_size,
+    start_at=start_index,
 )
 
 # apply the final offset vectors to destretch the image data
@@ -91,6 +101,7 @@ result = destretch_files(
 	out_dir,
 	"destr",
 	#in_avg_files=get_fits_paths(out_avg_dir),
+    start_at=start_index,
 )
 
 
