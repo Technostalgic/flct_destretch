@@ -7,14 +7,10 @@ sys.path.append(os.path.abspath(".."))  # Adjust path to package root
 
 # third party
 import numpy as np
-from astropy.io import fits
-import matplotlib.pyplot as plt
 
 # internal
 from ..abstraction import *
-from astropy.io import fits
-from ..utility import IndexSchema, get_fits_paths, load_image_data
-from ..reference_method import ExternalRefs, RollingWindow
+from ..utility import get_fits_paths
 
 ## Fetch Data ------------------------------------------------------------------
 
