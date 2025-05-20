@@ -60,7 +60,6 @@ print(f"calculating cumulative sums... {out_sum_dir}")
 calc_cumulative_sums(
     get_fits_paths(out_off_dir),
     out_sum_dir,
-    start_at=start_index,
 )
 
 # calculate the rolling sums of the cumulative sum offsets
@@ -70,7 +69,6 @@ calc_rolling_mean(
     out_avg_dir,
     window_left=rolling_mean_window_size,
     window_right=rolling_mean_window_size,
-    start_at=start_index,
 )
 
 # calculate the difs
@@ -80,7 +78,6 @@ calc_difs(
     get_fits_paths(out_avg_dir),
     out_off_final_dir,
     "final",
-    start_at=start_index,
 )
 
 # calculate the flowmap
@@ -89,7 +86,6 @@ calc_change_rate(
     get_fits_paths(out_avg_dir),
     out_flow_dir,
     window_size=flowmap_window_size,
-    start_at=start_index,
 )
 
 # apply the final offset vectors to destretch the image data
@@ -99,7 +95,6 @@ result = destretch_files(
 	get_fits_paths(out_off_final_dir),
 	out_dir,
 	"destr",
-    start_at=start_index,
 )
 
 
