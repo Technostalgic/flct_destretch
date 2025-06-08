@@ -20,7 +20,7 @@ from utility import get_fits_paths
 
 ## Fetch Data ------------------------------------------------------------------
 
-files_dir = os.path.abspath(os.path.join(".", "examples", "media"))
+files_dir = os.path.abspath(os.path.join(".", "flctdestretch", "examples", "media"))
 files = get_fits_paths(files_dir)
 files = files[0:10]
 # print("\n".join(files))
