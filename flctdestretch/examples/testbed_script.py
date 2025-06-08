@@ -1,3 +1,8 @@
+"""
+Example script to show basic use case. this should be run from the repo's
+base directory, otherwise it may not resolve imports properly
+"""
+
 ## Imports and Initialization -------------------------------------------------|
 print("Importing dependencies... ")
 
