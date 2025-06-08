@@ -3,18 +3,19 @@ print("Importing dependencies... ")
 
 import sys, time
 import os, os.path
-sys.path.append(os.path.abspath(".."))  # Adjust path to package root
+sys.path.insert(0, os.path.abspath("flctdestretch"))  # Adjust path to package root
+print(sys.path[0])
 
 # third party
 import numpy as np
 
 # internal
-from ..abstraction import *
-from ..utility import get_fits_paths
+from abstraction import *
+from utility import get_fits_paths
 
 ## Fetch Data ------------------------------------------------------------------
 
-files_dir = os.path.abspath(os.path.join(".", "flctdestretch", "examples", "media"))
+files_dir = os.path.abspath(os.path.join(".", "examples", "media"))
 files = get_fits_paths(files_dir)
 files = files[0:10]
 # print("\n".join(files))

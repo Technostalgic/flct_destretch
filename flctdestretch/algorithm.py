@@ -13,7 +13,7 @@ from scipy.interpolate import RectBivariateSpline
 from typing import Tuple, Literal, Any
 
 # internal
-from .destretch_types import DestretchParams, DestretchLoopResult
+from destretch_types import DestretchParams, DestretchLoopResult
 
 
 ## Processing: ----------------------------------------------------------------|

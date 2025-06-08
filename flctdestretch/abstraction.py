@@ -5,12 +5,12 @@ import numpy as np
 from scipy.ndimage import map_coordinates
 from astropy.io import fits
 
-from .algorithm import (
+from algorithm import (
     doreg, destr_control_points, reg_loop,
     DestretchLoopResult
 )
-from .utility import IndexSchema, load_image_data
-from .reference_method import RefMethod, RollingWindow, PreviousRef, WindowEdgeBehavior
+from utility import IndexSchema, load_image_data
+from reference_method import RefMethod, RollingWindow, PreviousRef, WindowEdgeBehavior
 
 ## Utility Types ---------------------------------------------------------------
 
