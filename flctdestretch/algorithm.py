@@ -173,6 +173,8 @@ def crosscor_maxpos(cc, max_fit_method=1):
     mx  = np.amax(cc)
     loc = cc.argmax()
 
+    # TODO CC filtering
+
     ccsz = cc.shape
     ymax = loc % ccsz[0]
     xmax = loc // ccsz[0]
@@ -182,9 +184,6 @@ def crosscor_maxpos(cc, max_fit_method=1):
 
     if xmax*ymax > 0 and xmax < (ccsz[0]-1) and ymax < (ccsz[1]-1):
         if max_fit_method == 1: # what is max fit method 1 vs 2?
-
-            # TODO CC filtering
-            
             denom = 2 * mx - cc[xmax-1,ymax] - cc[xmax+1,ymax]
             xfra = (xmax-1/2) + (mx-cc[xmax-1,ymax])/denom
 
