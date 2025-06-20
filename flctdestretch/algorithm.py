@@ -167,7 +167,8 @@ def smouth(nx, ny):
 
 def crosscor_maxpos(cc, max_fit_method=1):
     """
-    TODO docstring
+    find the point at which the cross correlation is maximized, which 
+    should correspond to the (sub)image offset
     """
     mx  = np.amax(cc)
     loc = cc.argmax()
@@ -180,7 +181,10 @@ def crosscor_maxpos(cc, max_fit_method=1):
     #(from Niblack, W: An Introduction to Digital Image Processing, p 139.)
 
     if xmax*ymax > 0 and xmax < (ccsz[0]-1) and ymax < (ccsz[1]-1):
-        if max_fit_method == 1:
+        if max_fit_method == 1: # what is max fit method 1 vs 2?
+
+            # TODO CC filtering
+            
             denom = 2 * mx - cc[xmax-1,ymax] - cc[xmax+1,ymax]
             xfra = (xmax-1/2) + (mx-cc[xmax-1,ymax])/denom
 
