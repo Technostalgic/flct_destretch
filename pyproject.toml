@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Some python FLCT destretching algorithms for heliophysics image processing"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 classifiers = [
 	"Programming Language :: Python :: 3",
 	"License :: OSI Approved :: BSD License",

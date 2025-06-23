@@ -3,7 +3,6 @@ Primary algorithm module to perform flct destretching image processing based
 on implementation by Momchil Molnar
 """
 
-
 ## Imports and Initialization -------------------------------------------------|
 
 import time
@@ -165,44 +164,49 @@ def smouth(nx, ny):
 
     return mm
 
-def crosscor_maxpos(cc, max_fit_method=1):
+USE_CC_FILTERING: bool = False
+CC_FILTER_THRESH: float = 7e5
+def crosscor_maxpos(cc: np.ndarray, max_fit_method: int = 1) -> tuple[float, float]:
     """
     find the point at which the cross correlation is maximized, which 
     should correspond to the (sub)image offset
     """
-    mx  = np.amax(cc)
-    loc = cc.argmax()
+    max_pos: int = cc.argmax()
+    ccsize: tuple[int, int] = cc.shape
+    max_pos_y: int = max_pos % ccsize[0]
+    max_pos_x: int = max_pos // ccsize[0]
+    max_corr: float = cc[(max_pos_y, max_pos_x)]
 
-    # TODO CC filtering
-
-    ccsz = cc.shape
-    ymax = loc % ccsz[0]
-    xmax = loc // ccsz[0]
+    if USE_CC_FILTERING:
+        avg_corr: float = cc.mean()
+        corr_dif: float = max_corr - avg_corr
+        # TODO CC filtering
+        if corr_dif < CC_FILTER_THRESH:
+            return ccsize[0] / 2.0, ccsize[1] / 2.0
 
     #a more complicated interpolation
     #(from Niblack, W: An Introduction to Digital Image Processing, p 139.)
 
-    if xmax*ymax > 0 and xmax < (ccsz[0]-1) and ymax < (ccsz[1]-1):
+    xmax: float = 0.0
+    ymax: float = 0.0
+    if max_pos_x*max_pos_y > 0 and max_pos_x < (ccsize[0]-1) and max_pos_y < (ccsize[1]-1):
         if max_fit_method == 1: # what is max fit method 1 vs 2?
-            denom = 2 * mx - cc[xmax-1,ymax] - cc[xmax+1,ymax]
-            xfra = (xmax-1/2) + (mx-cc[xmax-1,ymax])/denom
+            denom: float = 2 * max_corr - cc[max_pos_x-1,max_pos_y] - cc[max_pos_x+1,max_pos_y]
+            xmax = (max_pos_x - 0.5) + (max_corr-cc[max_pos_x-1,max_pos_y])/denom
 
-            denom = 2 * mx - cc[xmax,ymax-1] - cc[xmax,ymax+1]
-            yfra = (ymax-1/2) + (mx-cc[xmax,ymax-1])/denom
-
-            xmax=xfra
-            ymax=yfra
+            denom = 2 * max_corr - cc[max_pos_x,max_pos_y-1] - cc[max_pos_x,max_pos_y+1]
+            ymax: float = (max_pos_y - 0.5) + (max_corr-cc[max_pos_x,max_pos_y-1])/denom
         elif max_fit_method == 2:
-            a2 = (cc[xmax+1, ymax] - cc[xmax-1, ymax])/2.
-            a3 = (cc[xmax+1, ymax]/2. - cc[xmax, ymax] + cc[xmax-1, ymax]/2.)
-            a4 = (cc[xmax, ymax+1] - cc[xmax, ymax-1])/2.
-            a5 = (cc[xmax, ymax+1]/2. - cc[xmax, ymax] + cc[xmax, ymax-1]/2.)
-            a6 = (cc[xmax+1, ymax+1] - cc[xmax+1, ymax-1] 
-                - cc[xmax-1, ymax+1] + cc[xmax-1, ymax-1])/4.
-            xdif = (2*a2*a5 - a4*a6) / (a6**2 - 4*a3*a5)
-            ydif = (2*a3*a4 - a2*a6) / (a6**2 - 4*a3*a5)
-            xmax = xmax + xdif
-            ymax = ymax + ydif
+            a2 = (cc[max_pos_x+1, max_pos_y] - cc[max_pos_x-1, max_pos_y])/2.
+            a3 = (cc[max_pos_x+1, max_pos_y]/2. - cc[max_pos_x, max_pos_y] + cc[max_pos_x-1, max_pos_y]/2.)
+            a4 = (cc[max_pos_x, max_pos_y+1] - cc[max_pos_x, max_pos_y-1])/2.
+            a5 = (cc[max_pos_x, max_pos_y+1]/2. - cc[max_pos_x, max_pos_y] + cc[max_pos_x, max_pos_y-1]/2.)
+            a6 = (cc[max_pos_x+1, max_pos_y+1] - cc[max_pos_x+1, max_pos_y-1] 
+                - cc[max_pos_x-1, max_pos_y+1] + cc[max_pos_x-1, max_pos_y-1])/4.
+            xdif: float = (2*a2*a5 - a4*a6) / (a6**2 - 4*a3*a5)
+            ydif: float = (2*a3*a4 - a2*a6) / (a6**2 - 4*a3*a5)
+            xmax = max_pos_x + xdif
+            ymax = max_pos_y + ydif
 
     return ymax, xmax
 
@@ -502,6 +506,7 @@ def destr_control_points(
 
     return destr_info, rcps
 
+SUBFIELD_CORRS = 0
 def controlpoint_offsets_fft(
         scene, subfield_fftconj, apod_window, 
         lowpass_filter, destr_info
@@ -528,7 +533,10 @@ def controlpoint_offsets_fft(
         X and Y offsets for control points
 
     """
+    global SUBFIELD_CORRS
     subfield_offsets = np.zeros((2, destr_info.cpx, destr_info.cpy), order="F")
+    ccshape = (int(destr_info.kx), int(destr_info.ky))
+    subfield_correlations = np.zeros((2, destr_info.cpx * ccshape[0], destr_info.cpy * ccshape[1]), order="F")
 
     # number of array elements in each subfield
     nels = destr_info.kx * destr_info.ky
@@ -564,7 +572,13 @@ def controlpoint_offsets_fft(
 
             subfield_offsets[0,i,j] = sub_strt_x + xmax
             subfield_offsets[1,i,j] = sub_strt_y + ymax
+            start_x = i * ccshape[0]
+            start_y = j * ccshape[1]
+            print(subfield_correlations.shape)
+            subfield_correlations[0, start_x:ccshape[0], start_y:ccshape[1]] = cc
+            subfield_correlations[1, start_x:ccshape[0], start_y:ccshape[1]] = cc
 
+    SUBFIELD_CORRS = subfield_correlations
     return subfield_offsets
 
 def controlpoint_offsets_adf(
