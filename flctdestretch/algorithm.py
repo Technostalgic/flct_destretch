@@ -165,7 +165,6 @@ def smouth(nx, ny):
     return mm
 
 USE_CC_FILTERING: bool = False
-CC_FILTER_THRESH: float = 7e5
 def crosscor_maxpos(cc: np.ndarray, max_fit_method: int = 1) -> tuple[float, float]:
     """
     find the point at which the cross correlation is maximized, which 
@@ -175,14 +174,14 @@ def crosscor_maxpos(cc: np.ndarray, max_fit_method: int = 1) -> tuple[float, flo
     ccsize: tuple[int, int] = cc.shape
     max_pos_y: int = max_pos % ccsize[0]
     max_pos_x: int = max_pos // ccsize[0]
-    max_corr: float = cc[(max_pos_y, max_pos_x)]
+    max_corr: float = cc[max_pos_x, max_pos_y]
 
     if USE_CC_FILTERING:
-        avg_corr: float = cc.mean()
-        corr_dif: float = max_corr - avg_corr
+        min_corr: float = cc.min()
+        corr_dif: float = max_corr - min_corr
+        if corr_dif < 3e5:
+            return ccsize[0] * 0.5, ccsize[1] * 0.5
         # TODO CC filtering
-        if corr_dif < CC_FILTER_THRESH:
-            return ccsize[0] / 2.0, ccsize[1] / 2.0
 
     #a more complicated interpolation
     #(from Niblack, W: An Introduction to Digital Image Processing, p 139.)
@@ -191,11 +190,16 @@ def crosscor_maxpos(cc: np.ndarray, max_fit_method: int = 1) -> tuple[float, flo
     ymax: float = 0.0
     if max_pos_x*max_pos_y > 0 and max_pos_x < (ccsize[0]-1) and max_pos_y < (ccsize[1]-1):
         if max_fit_method == 1: # what is max fit method 1 vs 2?
-            denom: float = 2 * max_corr - cc[max_pos_x-1,max_pos_y] - cc[max_pos_x+1,max_pos_y]
-            xmax = (max_pos_x - 0.5) + (max_corr-cc[max_pos_x-1,max_pos_y])/denom
+            cc_left = cc[max_pos_x-1,max_pos_y]
+            cc_right = cc[max_pos_x+1,max_pos_y]
+            xdenom: float = 2 * max_corr - cc_left - cc_right
+            xmax = (max_pos_x - 0.5) + (max_corr - cc_left) / xdenom
 
-            denom = 2 * max_corr - cc[max_pos_x,max_pos_y-1] - cc[max_pos_x,max_pos_y+1]
-            ymax: float = (max_pos_y - 0.5) + (max_corr-cc[max_pos_x,max_pos_y-1])/denom
+            cc_bottom = cc[max_pos_x,max_pos_y-1]
+            cc_top = cc[max_pos_x,max_pos_y+1]
+            ydenom = 2 * max_corr - cc_bottom - cc_top
+            ymax: float = (max_pos_y - 0.5) + (max_corr - cc_bottom) / ydenom
+                
         elif max_fit_method == 2:
             a2 = (cc[max_pos_x+1, max_pos_y] - cc[max_pos_x-1, max_pos_y])/2.
             a3 = (cc[max_pos_x+1, max_pos_y]/2. - cc[max_pos_x, max_pos_y] + cc[max_pos_x-1, max_pos_y]/2.)
@@ -574,9 +578,8 @@ def controlpoint_offsets_fft(
             subfield_offsets[1,i,j] = sub_strt_y + ymax
             start_x = i * ccshape[0]
             start_y = j * ccshape[1]
-            print(subfield_correlations.shape)
-            subfield_correlations[0, start_x:ccshape[0], start_y:ccshape[1]] = cc
-            subfield_correlations[1, start_x:ccshape[0], start_y:ccshape[1]] = cc
+            subfield_correlations[0, start_x : start_x + ccshape[0], start_y: start_y + ccshape[1]] = cc
+            subfield_correlations[1, start_x : start_x + ccshape[0], start_y: start_y + ccshape[1]] = cc
 
     SUBFIELD_CORRS = subfield_correlations
     return subfield_offsets
