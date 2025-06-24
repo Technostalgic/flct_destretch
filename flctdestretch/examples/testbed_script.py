@@ -17,17 +17,19 @@ import numpy as np
 # internal
 from abstraction import *
 from utility import get_fits_paths
+import algorithm
+algorithm.USE_CC_FILTERING = True
 
 ## Fetch Data ------------------------------------------------------------------
 
 files_dir = os.path.abspath(os.path.join(".", "flctdestretch", "examples", "media"))
 files = get_fits_paths(files_dir)
-files = files[0:10]
+files = files[0:11]
 # print("\n".join(files))
 print(f"{len(files)} files found")
 
 # variables for destretching config
-kernel_sizes: np.ndarray[np.int64] = np.array([128, 64])
+kernel_sizes: np.ndarray[np.int64] = np.array([64, 32, 16])
 rolling_mean_window_size: int = 5
 flowmap_window_size: int = 5
 
