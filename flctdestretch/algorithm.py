@@ -176,11 +176,7 @@ def crosscor_maxpos(cc: np.ndarray, max_fit_method: int = 1) -> tuple[float, flo
     max_pos_x: int = max_pos // ccsize[0]
     max_corr: float = cc[max_pos_x, max_pos_y]
 
-    if USE_CC_FILTERING:
-        min_corr: float = cc.min()
-        corr_dif: float = max_corr - min_corr
-        if corr_dif < 3e5:
-            return ccsize[0] * 0.5, ccsize[1] * 0.5
+    if USE_CC_FILTERING: pass
         # TODO CC filtering
 
     #a more complicated interpolation
@@ -512,8 +508,11 @@ def destr_control_points(
 
 SUBFIELD_CORRS = 0
 def controlpoint_offsets_fft(
-        scene, subfield_fftconj, apod_window, 
-        lowpass_filter, destr_info
+        scene, 
+        subfield_fftconj, # fft of reference image  
+        apod_window, 
+        lowpass_filter, 
+        destr_info: DestretchParams
     ):
     """
     Locate control points
@@ -562,6 +561,92 @@ def controlpoint_offsets_fft(
 
             scene_subarr_fft = np.array(np.fft.fft2(scene_subarr * apod_window), order="F")
             scene_subarr_fft = scene_subarr_fft  * subfield_fftconj[:, :, i, j] * lowpass_filter
+        
+            scene_subarr_ifft = np.abs(np.fft.ifft2(scene_subarr_fft), order="F")
+            cc = np.roll(scene_subarr_ifft, (int(destr_info.kx/2), int(destr_info.ky/2)),
+                            axis=(0, 1))
+            #cc = np.fft.fftshift(scene_subarr_ifft)
+            cc = np.array(cc, order="F")
+
+            #print("Crosscorrelation Maxpos Order: ", destr_info.max_fit_method)
+
+            ymax, xmax = crosscor_maxpos(cc, destr_info.max_fit_method)
+            #print(cc.shape, ymax, xmax)
+
+            subfield_offsets[0,i,j] = sub_strt_x + xmax
+            subfield_offsets[1,i,j] = sub_strt_y + ymax
+            start_x = i * ccshape[0]
+            start_y = j * ccshape[1]
+            subfield_correlations[0, start_x : start_x + ccshape[0], start_y: start_y + ccshape[1]] = cc
+            subfield_correlations[1, start_x : start_x + ccshape[0], start_y: start_y + ccshape[1]] = cc
+
+    SUBFIELD_CORRS = subfield_correlations
+    return subfield_offsets
+
+def controlpoint_offsets_fft_nopre(
+        scene, 
+        ref,
+        apod_window, 
+        lowpass_filter, 
+        destr_info: DestretchParams
+    ):
+    """
+    Locate control points
+
+    Parameters
+    ----------
+    scene : array
+        a 2-dimensional array (L x M) containing the image to be registered
+    subfield_fftconj : array
+        the array of FFTs of all the image subfields, as cutout from the reference array
+    apod_mask : array
+        apodization mask, darkens edges of images to reduce FFT artifacts
+    lowpass_filter : array
+        reduces high-frequency noise in FFT
+    destr_info : structure
+        Destretch information
+
+    Returns
+    -------
+    subfield_offsets : array
+        X and Y offsets for control points
+
+    """
+    global SUBFIELD_CORRS
+    subfield_offsets = np.zeros((2, destr_info.cpx, destr_info.cpy), order="F")
+    ccshape = (int(destr_info.kx), int(destr_info.ky))
+    subfield_correlations = np.zeros((2, destr_info.cpx * ccshape[0], destr_info.cpy * ccshape[1]), order="F")
+
+    # number of array elements in each subfield
+    nels = destr_info.kx * destr_info.ky
+
+    for j in range(0, destr_info.cpy):
+ 
+        for i in range(0, destr_info.cpx):
+
+            sub_strt_x  = int(destr_info.rcps[0,i,j] - destr_info.kx/2)
+            sub_end_x   = int(sub_strt_x + destr_info.kx - 1)
+
+            sub_strt_y  = int(destr_info.rcps[1,i,j] - destr_info.ky/2)
+            sub_end_y   = int(sub_strt_y + destr_info.ky - 1)
+
+            #cross correlation, inline
+            scene_subarr = scene[sub_strt_x:sub_end_x+1, sub_strt_y:sub_end_y+1].copy()
+            ref_subarr = ref[sub_strt_x:sub_end_x+1, sub_strt_y:sub_end_y+1].copy()
+
+            # normalize the cross correlation
+            scene_std = np.std(scene_subarr)
+            ref_std = np.std(ref_subarr)
+            normfactor = scene_std * ref_std
+            scene_subarr /= normfactor
+            ref_subarr /= normfactor
+
+            scene_subarr -= surface_fit(scene_subarr, destr_info.subfield_correction)
+            ref_subarr -= surface_fit(ref_subarr, destr_info.subfield_correction)
+
+            scene_subarr_fft = np.array(np.fft.fft2(scene_subarr * apod_window), order="F")
+            ref_subarr_fft = np.array(np.conj(np.fft.fft2(ref_subarr * apod_window)), order="F")
+            scene_subarr_fft = scene_subarr_fft  * ref_subarr_fft * lowpass_filter
         
             scene_subarr_ifft = np.abs(np.fft.ifft2(scene_subarr_fft), order="F")
             cc = np.roll(scene_subarr_ifft, (int(destr_info.kx/2), int(destr_info.ky/2)),
@@ -823,7 +908,7 @@ def doreg(scene, r, d, destr_info):
     scene : TYPE
         Scene to be destretched
     r : TYPE
-        reference displacements of the control points
+        map of center positions of corresponding control points
     d : TYPE
         Actual displacements of the control points
     destr_info: Destr class
@@ -843,7 +928,7 @@ def doreg(scene, r, d, destr_info):
     #xy = np.swapaxes(xy, 1, 2)
     #scene = np.swapaxes(copy.deepcopy(scene), 0, 1)
 
-    ans = bilin_values_scene(scene, xy, destr_info, nearest_neighbor=False)
+    ans = bilin_values_scene(scene, xy, destr_info)
 
     return ans
 
@@ -908,9 +993,9 @@ def reg(
     if do_timing: start = time.time()
 
     if use_fft:
-        subfield_fftconj, subfields_images = doref(ref, apod_window, destr_info)
+        # subfield_fftconj, subfields_images = doref(ref, apod_window, destr_info)
         # print(scene.shape, apod_window.shape, smou.shape, destr_info)
-        disp = controlpoint_offsets_fft(scene, subfield_fftconj, apod_window, smou, destr_info)
+        disp = controlpoint_offsets_fft_nopre(scene, ref, apod_window, smou, destr_info)
     else:
         disp = controlpoint_offsets_adf(scene, ref, destr_info, adf_pad, adf_pow)
     
@@ -927,15 +1012,15 @@ def reg(
     x = doreg(scene, rdisp, disp, destr_info)
     ans = x
 
-#    print(f"Total destr took: {(end - start):.5f} seconds for kernel"
- #         +f"of size {kernel_size} px.")
+    #print(f"Total destr took: {(end - start):.5f} seconds for kernel"
+    #   +f"of size {kernel_size} px.")
 
     return ans, disp, rdisp, destr_info
 
 
 ## Window ---------------------------------------------------------------------|
 
-def doref(ref_image, apod_mask, destr_info):
+def doref(ref_image, apod_mask, destr_info: DestretchParams):
     """
     Setup reference window
 

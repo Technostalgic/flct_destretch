@@ -227,7 +227,7 @@ def fits_file_process_iter(
             image_data,
             np.zeros((1,1)), # kernel?
             border_offset=0, # should be default?
-            spacing_ratio=0 # should be defailt?
+            spacing_ratio=0 # should be default?
         )
 
         # invert the offset data and apply it as a correction to destretch the original image
