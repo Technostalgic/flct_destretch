@@ -387,6 +387,9 @@ def destr_control_points(
 	rcps : TYPE
 		DESCRIPTION.
 	"""
+	# TODO 'kernel' can just be an int? no need to create an entire 
+	# multidimensional array just to use it's size?
+
 	define_cntl_pts_orig = 0
 	destr_info = DestretchParams()
 
@@ -621,7 +624,6 @@ def controlpoint_offsets_fft_nopre(
 	nels = destr_info.kx * destr_info.ky
 
 	for j in range(0, destr_info.cpy):
- 
 		for i in range(0, destr_info.cpx):
 
 			sub_strt_x  = int(destr_info.rcps[0,i,j] - destr_info.kx/2)
@@ -781,12 +783,11 @@ def reg_loop_filtered(
 			displacements,
 			ref_displacements,
 			destr_info,
-		) = reg(
+		) = reg_filtered(
 			tscene,
 			ref_scene,
 			ksize,
 			apod_mask_ratio,
-			True, 0.25, 2,
 			border_offset,
 			spacing_ratio
 		)
@@ -991,6 +992,44 @@ def doreg(scene, r, d, destr_info):
 	ans = bilin_values_scene(scene, xy, destr_info)
 
 	return ans
+
+def reg_filtered(
+	scene: np.ndarray, 
+	ref_scene: np.ndarray,
+	kernel_size: int,
+	apod_mask_ratio: float,
+	border_offset: int = 4,
+	spacing_ratio: float = 0.5,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, DestretchParams]:
+	# center scene and ref around zero 
+	# TODO this may not be needed since it is essentially what surface_fit() 
+	# is doing?
+	scene -= scene.mean()
+	ref_scene -= ref_scene.mean()
+	
+	# compute locations for control points based on kernel size and 
+	# spacing parameters
+	kernel = np.zeros((kernel_size, kernel_size))
+	destr_info, ref_disp_map = destr_control_points(
+		ref_scene, kernel, border_offset, spacing_ratio, apod_mask_ratio
+	)
+
+	# apply only properties that are properly implemented at the moment
+	destr_info.subfield_correction = 1
+	destr_info.use_fft = True
+
+	# get filter windows
+	apod_window = apod_mask(destr_info.kx, destr_info.ky, destr_info.mf)
+	smou = smouth(destr_info.kx, destr_info.ky)
+
+	# calculate destretched result
+	# TODO apply cc filtering as seen in test_deartifact.ipynb
+	displacements = controlpoint_offsets_fft_nopre(
+		scene, ref_scene, apod_window, smou, destr_info
+	)
+	result = doreg(scene, ref_disp_map, displacements, destr_info)
+
+	return result, displacements, ref_disp_map, destr_info
 
 def reg(
 		scene, ref, kernel_size, mf=0.08, 
