@@ -6,7 +6,7 @@ from scipy.ndimage import map_coordinates
 from astropy.io import fits
 
 from algorithm import (
-    doreg, destr_control_points, reg_loop,
+    doreg, destr_control_points, reg_loop_filtered,
     DestretchLoopResult
 )
 from utility import IndexSchema, load_image_data
@@ -103,7 +103,7 @@ def fits_file_destretch_iter(
 
         # perform image destretching
         print(f"processing image #{i}.." + in_filepaths[i])
-        result = reg_loop(
+        result = reg_loop_filtered(
             image_data,
             reference_image,
             kernel_sizes,
