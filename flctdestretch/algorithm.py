@@ -164,6 +164,39 @@ def smouth(nx, ny):
 
 	return mm
 
+def correlation_peak(cross_corr: np.ndarray) -> tuple[float, float, float, int, int]:
+	"""
+	Return information about the highest correlation peak, in the form:
+	(max correlation, interpolated x position, y position, pixel x coordinate, y coordinate)
+	Args:
+		cross_corr: the cross correlation map
+	"""
+	cc_size = cross_corr.shape
+	xcoord, ycoord = divmod(cross_corr.argmax(), cc_size[0])
+	max_corr: float = cross_corr[xcoord, ycoord]
+
+	# apply a 2d polynomial fit to try to interpolate coordinate values to a 
+	# peak values that can lie in between pixels
+	xpos, ypos = (0.0, 0.0)
+	if xcoord * ycoord > 0 and xcoord < (cc_size[0] - 1) and ycoord < (cc_size[1] - 1):
+		cc_left = cross_corr[xcoord - 1,ycoord]
+		cc_right = cross_corr[xcoord + 1,ycoord]
+		xdenom: float = 2 * max_corr - cc_left - cc_right
+		xpos = (xcoord - 0.5) + (max_corr - cc_left) / xdenom
+
+		cc_bottom = cross_corr[xcoord,ycoord - 1]
+		cc_top = cross_corr[xcoord,ycoord + 1]
+		ydenom = 2 * max_corr - cc_bottom - cc_top
+		ypos: float = (ycoord - 0.5) + (max_corr - cc_bottom) / ydenom
+
+
+	return (
+		max_corr,
+		xpos, ypos,
+		xcoord, ycoord
+	)
+
+
 USE_CC_FILTERING: bool = False
 def crosscor_maxpos(cc: np.ndarray, max_fit_method: int = 1) -> tuple[float, float]:
 	"""
@@ -592,7 +625,7 @@ def controlpoint_offsets_fft_nopre(
 		apod_window, 
 		lowpass_filter, 
 		destr_info: DestretchParams
-	):
+	) -> tuple[np.ndarray, np.ndarray]:
 	"""
 	Locate control points
 
@@ -620,8 +653,9 @@ def controlpoint_offsets_fft_nopre(
 	ccshape = (int(destr_info.kx), int(destr_info.ky))
 	subfield_correlations = np.zeros((2, destr_info.cpx * ccshape[0], destr_info.cpy * ccshape[1]), order="F")
 
-	# number of array elements in each subfield
-	nels = destr_info.kx * destr_info.ky
+	# the difference between the first and second peaks in the cross 
+	# correlation for each subwindow
+	cc_peakdiffs = np.zeros((destr_info.cpx, destr_info.cpy), order="F")
 
 	for j in range(0, destr_info.cpy):
 		for i in range(0, destr_info.cpx):
@@ -658,7 +692,7 @@ def controlpoint_offsets_fft_nopre(
 
 			#print("Crosscorrelation Maxpos Order: ", destr_info.max_fit_method)
 
-			ymax, xmax = crosscor_maxpos(cc, destr_info.max_fit_method)
+			cc_peak, ymax, xmax, xcoord, ycoord = correlation_peak(cc, destr_info.max_fit_method)
 			#print(cc.shape, ymax, xmax)
 
 			subfield_offsets[0,i,j] = sub_strt_x + xmax
@@ -668,8 +702,16 @@ def controlpoint_offsets_fft_nopre(
 			subfield_correlations[0, start_x : start_x + ccshape[0], start_y: start_y + ccshape[1]] = cc
 			subfield_correlations[1, start_x : start_x + ccshape[0], start_y: start_y + ccshape[1]] = cc
 
+			# Calculate the peak differences
+			peak_mask = get_radial_mask((xcoord, ycoord), ccshape, ccshape[0] * 0.25)
+			cc_masked = cc.copy()
+			cc_masked[~peak_mask] = -np.inf
+			cc_max_x2, cc_max_y2 = divmod(cc_masked.argmax(), ccshape[0])
+			cc_peak2 = find_local_maxima(cc, (cc_max_x2, cc_max_y2))
+			cc_peakdiffs[i, j] = cc_peak - cc_peak2
+
 	SUBFIELD_CORRS = subfield_correlations
-	return subfield_offsets
+	return subfield_offsets, cc_peakdiffs
 
 def controlpoint_offsets_adf(
 	scene, reference, destr_info, 
@@ -747,13 +789,67 @@ def controlpoint_offsets_adf(
 #                        cc4[m, n] = ss[m:m+d_info.wx, n:n+d_info.wy]
 #                cc = -np.sum(np.abs(cc4 - w[:, :, i, j]), (2, 3))**2
 
-			xmax, ymax = crosscor_maxpos(cc, destr_info.max_fit_method)
+			ymax, xmax = crosscor_maxpos(cc, destr_info.max_fit_method)
 
 			subfield_offsets[0,i,j] = sub_strt_x + destr_info.kx/2 + xmax - pad_x
 			subfield_offsets[1,i,j] = sub_strt_y + destr_info.ky/2 + ymax - pad_y
 
 	return subfield_offsets
 
+def get_radial_mask(
+	center: tuple[int, int], 
+	shape: tuple[int, int], 
+	min_range: float
+) -> np.ndarray:
+	"""
+	Parameters
+	----------
+	center: (x, y) the center of the mask radius
+	shape: (width, height) the size of the subwindow mask
+	min_range: the radius around the center to mask out
+	"""
+	ix, iy = center
+	wx, wy = np.indices(shape)
+	dx = np.minimum(np.abs(wx - ix), shape[0] - np.abs(wx - ix))
+	dy = np.minimum(np.abs(wy - iy), shape[1] - np.abs(wy - iy))
+	coord_dist_sq = dx * dx + dy * dy
+	return coord_dist_sq > min_range * min_range
+
+# neighbor order:
+# top left,     top center,     top right, 
+# mid left,                     mid right, 
+# botton left,  bottom center,  bottom right
+NEIGHBS_X = np.array([-1, 0, 1, -1, 1, -1, 0 ,1])
+NEIGHBS_Y = np.array([-1, -1, -1, 0, 0, 1, 1, 1])
+
+# algorithm to find local maxima from a given starting point by 
+# crawling upwards to higher values
+def find_local_maxima(
+	scene: np.ndarray,
+	start_coord: tuple[int, int],
+) -> tuple[int, int]:
+	"""
+	Returns the 2d (x, y) index of the local maxima uphill from the 
+	given coordinate
+	Args:
+		scene: value map to climb up toward local peak from
+		start_coord: the coordinate to start crawling from
+	"""
+	ix, iy = start_coord
+	cc_size = scene.shape[0]
+	do_loop = True
+	while do_loop:
+		curr_val = scene[ix, iy]
+		cneighbs_x = (NEIGHBS_X + ix) % cc_size
+		cneighbs_y = (NEIGHBS_Y + iy) % cc_size
+		neighbs = scene[cneighbs_x, cneighbs_y]
+		max_neighb = np.argmax(neighbs)
+		max_neighb_val = neighbs[max_neighb]
+		do_loop = max_neighb_val > curr_val
+		if do_loop:
+			ix = (ix + NEIGHBS_X[max_neighb]) % cc_size
+			iy = (iy + NEIGHBS_Y[max_neighb]) % cc_size
+	return ix, iy
 
 ## Regularization -------------------------------------------------------------|
 
@@ -1010,7 +1106,7 @@ def reg_filtered(
 	# compute locations for control points based on kernel size and 
 	# spacing parameters
 	kernel = np.zeros((kernel_size, kernel_size))
-	destr_info, ref_disp_map = destr_control_points(
+	destr_info, control_points = destr_control_points(
 		ref_scene, kernel, border_offset, spacing_ratio, apod_mask_ratio
 	)
 
@@ -1022,14 +1118,109 @@ def reg_filtered(
 	apod_window = apod_mask(destr_info.kx, destr_info.ky, destr_info.mf)
 	smou = smouth(destr_info.kx, destr_info.ky)
 
-	# calculate destretched result
-	# TODO apply cc filtering as seen in test_deartifact.ipynb
-	displacements = controlpoint_offsets_fft_nopre(
+	# calculate destretch displacements
+	displacements, peakdiffs = controlpoint_offsets_fft_nopre(
 		scene, ref_scene, apod_window, smou, destr_info
 	)
-	result = doreg(scene, ref_disp_map, displacements, destr_info)
 
-	return result, displacements, ref_disp_map, destr_info
+	# filter out bad displacement values with neighbor averages
+	displacements = filter_displacements(displacements, peakdiffs)
+	
+	# destretch scene to get a destretched result
+	result = doreg(scene, control_points, displacements, destr_info)
+
+	return result, displacements, control_points, destr_info
+
+NEIGHB_INDICES = [(-1,-1), (-1,0), (-1,1), (0,-1), (0,1), (1,-1), (1,0), (1,1)]
+NEIGHB_TOTALWEIGHT = 4 + 4 * 2 ** 0.5
+EDGE_WEIGHT = 1 + 2 * 2 ** 0.5
+CORNER_WEIGHT = 2 + 3 * 2 ** 0.5
+
+def filter_displacements(
+	displacements: np.ndarray, 
+	peak_diffs: np.ndarray, 
+	ksize: int
+) -> np.ndarray:
+	"""
+	filter out shifty displacements and replace them with neighbor averages
+	Args:
+		displacements: offset map to filter (this parameter will be modified)
+		peak_diffs: difference between the two highest peaks for each subwindow correlation map
+		ksize: kernel size of each window
+	"""
+	# go through each kernel displacement and mark suspiciously large 
+	# displacement values as NaN if they don't meet a correlation threshold
+	filter_count: int = 0
+	width, height = displacements.shape
+	for x in range(width):
+		for y in range(height):
+
+			# calculate the total wight for this cell based on if its in the 
+			# center, or on the edges or a corner
+			tweight = NEIGHB_TOTALWEIGHT
+			if x == 0 or x == width - 1: 
+				if y == 0 or y == height - 1: tweight -= CORNER_WEIGHT
+				else: tweight -= EDGE_WEIGHT
+			elif y == 0 or y == height - 1: tweight -= EDGE_WEIGHT
+
+			# calculate the normalized neighbor average x and y values
+			avgx = 0
+			avgy = 0
+			for neighbind in NEIGHB_INDICES:
+				tind = (x + neighbind[0], y + neighbind[1])
+				if tind[0] < 0 or tind[0] >= width or tind[1] < 0 or tind[1] >= height: 
+					continue
+				avgx += displacements[0, tind[0], tind[1]]
+				avgy += displacements[1, tind[0], tind[1]]
+			avgx /= tweight
+			avgy /= tweight
+
+			# calculate the correlation threshold based on how much a 
+			# displacement vector differs from its neighbors (larger 
+			# displacement magnitudes mean that a higher correlation threshold 
+			# must be met)
+			dx = abs(displacements[0, x, y] - avgx) / float(ksize)
+			dy = abs(displacements[1, x, y] - avgy) / float(ksize)
+			dmag = np.sqrt(dx * dx + dy * dy)
+			threshold = dmag * dmag * 0.05
+			if peak_diffs[x, y] < threshold:
+				displacements[0, x, y] = np.nan
+				displacements[1, x, y] = np.nan
+				filter_count += 1
+
+	# keep iterating through displacements until all NaNs are corrected
+	did_filter = True
+	kept_nan = True
+	while did_filter and kept_nan:
+		did_filter = False
+		kept_nan = False
+		for x in range(width):
+			for y in range(height):
+				vx, vy = displacements[:, x, y]
+				if np.isnan(vx) or np.isnan(vy):
+					
+					# calculate neighbor displacement average and use that for
+					#  all NaN values
+					cxneighbs = NEIGHBS_X + max(0, min(x, width - 2))
+					cyneighbs = NEIGHBS_Y + max(0, min(y, height - 2))
+					mean_x = np.nanmean(displacements[0, cxneighbs, cyneighbs])
+					mean_y = np.nanmean(displacements[1, cxneighbs, cyneighbs])
+					if np.isnan(mean_x): kept_nan = True
+					else:
+						displacements[0, x, y] = mean_x
+						did_filter = True
+					if np.isnan(mean_y): kept_nan = True
+					else:
+						displacements[1, x, y] = mean_y
+						did_filter = True
+		
+		# if there are still NaNs left, but no filtering happened in the last 
+		# iteration, we've reached a stalemate where no more NaNs can 
+		# be corrected
+		if kept_nan and not did_filter:
+			break
+						
+	return displacements
 
 def reg(
 		scene, ref, kernel_size, mf=0.08, 
@@ -1094,7 +1285,7 @@ def reg(
 	if use_fft:
 		# subfield_fftconj, subfields_images = doref(ref, apod_window, destr_info)
 		# print(scene.shape, apod_window.shape, smou.shape, destr_info)
-		disp = controlpoint_offsets_fft_nopre(scene, ref, apod_window, smou, destr_info)
+		disp, _ = controlpoint_offsets_fft_nopre(scene, ref, apod_window, smou, destr_info)
 	else:
 		disp = controlpoint_offsets_adf(scene, ref, destr_info, adf_pad, adf_pow)
 	
