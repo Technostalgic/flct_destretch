@@ -878,14 +878,13 @@ def reg_loop_filtered(
 			displacements,
 			ref_displacements,
 			destr_info,
-		) = reg(
+		) = reg_filtered(
 			tscene,
 			ref_scene,
 			ksize,
 			apod_mask_ratio,
-			True, 0.25, 2,
 			border_offset,
-			spacing_ratio
+			spacing_ratio,
 		)
 
 		# increment displacement and offsets map by this kernel size's 
@@ -897,6 +896,7 @@ def reg_loop_filtered(
 		)
 		disp_map += tdisp
 		offs_map += toffs
+		ref_disp_map += tdisp - toffs
 
 	# The displacement maps contain the pixel reference coordinates, so 
 	# adding them iteratively sums those reference coordinates divide by the 
