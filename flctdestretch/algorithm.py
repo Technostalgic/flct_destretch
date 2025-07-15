@@ -189,7 +189,6 @@ def correlation_peak(cross_corr: np.ndarray) -> tuple[float, float, float, int, 
 		ydenom = 2 * max_corr - cc_bottom - cc_top
 		ypos: float = (ycoord - 0.5) + (max_corr - cc_bottom) / ydenom
 
-
 	return (
 		max_corr,
 		xpos, ypos,
@@ -660,11 +659,11 @@ def controlpoint_offsets_fft_nopre(
 	for j in range(0, destr_info.cpy):
 		for i in range(0, destr_info.cpx):
 
-			sub_strt_x  = int(destr_info.rcps[0,i,j] - destr_info.kx/2)
-			sub_end_x   = int(sub_strt_x + destr_info.kx - 1)
+			sub_strt_x = int(destr_info.rcps[0,i,j] - destr_info.kx/2)
+			sub_end_x = int(sub_strt_x + destr_info.kx - 1)
 
-			sub_strt_y  = int(destr_info.rcps[1,i,j] - destr_info.ky/2)
-			sub_end_y   = int(sub_strt_y + destr_info.ky - 1)
+			sub_strt_y = int(destr_info.rcps[1,i,j] - destr_info.ky/2)
+			sub_end_y = int(sub_strt_y + destr_info.ky - 1)
 
 			#cross correlation, inline
 			scene_subarr = scene[sub_strt_x:sub_end_x+1, sub_strt_y:sub_end_y+1].copy()
@@ -690,9 +689,8 @@ def controlpoint_offsets_fft_nopre(
 			#cc = np.fft.fftshift(scene_subarr_ifft)
 			cc = np.array(cc, order="F")
 
-			#print("Crosscorrelation Maxpos Order: ", destr_info.max_fit_method)
+			cc_peak, xmax, ymax, xcoord, ycoord = correlation_peak(cc)
 
-			cc_peak, ymax, xmax, xcoord, ycoord = correlation_peak(cc, destr_info.max_fit_method)
 			#print(cc.shape, ymax, xmax)
 
 			subfield_offsets[0,i,j] = sub_strt_x + xmax
@@ -707,7 +705,8 @@ def controlpoint_offsets_fft_nopre(
 			cc_masked = cc.copy()
 			cc_masked[~peak_mask] = -np.inf
 			cc_max_x2, cc_max_y2 = divmod(cc_masked.argmax(), ccshape[0])
-			cc_peak2 = find_local_maxima(cc, (cc_max_x2, cc_max_y2))
+			cc_peak2_x, cc_peak2_y = find_local_maxima(cc, (cc_max_x2, cc_max_y2))
+			cc_peak2 = cc[cc_peak2_x, cc_peak2_y]
 			cc_peakdiffs[i, j] = cc_peak - cc_peak2
 
 	SUBFIELD_CORRS = subfield_correlations
@@ -857,7 +856,7 @@ def reg_loop_filtered(
 	scene: np.ndarray, 
 	ref_scene: np.ndarray, 
 	kernel_sizes: list[int],
-	apod_mask_ratio: float,
+	apod_mask_ratio: float = 0.08,
 	border_offset: int = 4,
 	spacing_ratio: float = 0.5
 ) -> DestretchLoopResult:
@@ -879,11 +878,12 @@ def reg_loop_filtered(
 			displacements,
 			ref_displacements,
 			destr_info,
-		) = reg_filtered(
+		) = reg(
 			tscene,
 			ref_scene,
 			ksize,
 			apod_mask_ratio,
+			True, 0.25, 2,
 			border_offset,
 			spacing_ratio
 		)
@@ -1124,7 +1124,7 @@ def reg_filtered(
 	)
 
 	# filter out bad displacement values with neighbor averages
-	displacements = filter_displacements(displacements, peakdiffs)
+	displacements = filter_displacements(displacements, peakdiffs, kernel_size)
 	
 	# destretch scene to get a destretched result
 	result = doreg(scene, control_points, displacements, destr_info)
@@ -1151,7 +1151,7 @@ def filter_displacements(
 	# go through each kernel displacement and mark suspiciously large 
 	# displacement values as NaN if they don't meet a correlation threshold
 	filter_count: int = 0
-	width, height = displacements.shape
+	_, width, height = displacements.shape
 	for x in range(width):
 		for y in range(height):
 
