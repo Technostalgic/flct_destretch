@@ -6,7 +6,7 @@ from scipy.ndimage import map_coordinates
 from astropy.io import fits
 
 from algorithm import (
-    doreg, destr_control_points, reg_loop_filtered,
+    doreg, destr_control_points, reg_loop_filtered, reg_loop,
     DestretchLoopResult
 )
 from utility import IndexSchema, load_image_data
@@ -177,6 +177,8 @@ def fits_file_process_iter(
 
     # ensure there is an offset for each data
     if(len(in_data_files) != len(in_off_files)):
+        print(in_data_files)
+        print(in_off_files)
         raise Exception("Each data file must have a corresponding offset")
 
     # meta info from files
