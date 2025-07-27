@@ -22,16 +22,16 @@ algorithm.USE_CC_FILTERING = True
 
 ## Fetch Data ------------------------------------------------------------------
 
-files_dir = os.path.abspath(os.path.join(".", "flctdestretch", "examples", "media"))
+files_dir = os.path.abspath(os.path.join(".", "flctdestretch", "examples", "media", "large"))
 files = get_fits_paths(files_dir)
-files = files[0:11]
+files = files[120:180]
 # print("\n".join(files))
 print(f"{len(files)} files found")
 
 # variables for destretching config
 kernel_sizes: np.ndarray[np.int64] = np.array([64, 32, 16])
-rolling_mean_window_size: int = 5
-flowmap_window_size: int = 5
+rolling_mean_window_size: int = 15
+flowmap_window_size: int = 10
 
 # in case it fails partway through destretching, you can set this to start at 
 # the nth file, where n is the index of the last file that was successfully 

@@ -683,7 +683,12 @@ def controlpoint_offsets_fft_nopre(
 			ref_subarr_fft = np.array(np.conj(np.fft.fft2(ref_subarr * apod_window)), order="F")
 			scene_subarr_fft = scene_subarr_fft  * ref_subarr_fft * lowpass_filter
 		
-			scene_subarr_ifft = np.abs(np.fft.ifft2(scene_subarr_fft), order="F")
+			scene_subarr_ifft = np.fft.ifft2(scene_subarr_fft)
+			min = np.min(scene_subarr_ifft)
+			scene_subarr_ifft -= min
+			scene_subarr_ifft = np.abs(scene_subarr_ifft, order="F")
+			scene_subarr_ifft -= np.abs(min)
+			
 			cc = np.roll(scene_subarr_ifft, (int(destr_info.kx/2), int(destr_info.ky/2)),
 							axis=(0, 1))
 			#cc = np.fft.fftshift(scene_subarr_ifft)
