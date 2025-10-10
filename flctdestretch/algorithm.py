@@ -1160,6 +1160,9 @@ def filter_displacements(
 	for x in range(width):
 		for y in range(height):
 
+			# TODO: this fixes the edges being all fucked up if we just skip them
+			# if x == 0 or y == 0 or x == width - 1 or y == height - 1: continue
+
 			# calculate the total wight for this cell based on if its in the 
 			# center, or on the edges or a corner
 			tweight = NEIGHB_TOTALWEIGHT
