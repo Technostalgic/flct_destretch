@@ -10,6 +10,62 @@ from matplotlib import cm
 from abstraction import resize_vector_map
 from utility import IndexSchema, load_image_data
 
+def get_frame_bgr(
+    data: np.ndarray, 
+    video_writer: cv2.VideoWriter, 
+    map_rgb: Callable | None, 
+    data_range: float, 
+    data_min: float, 
+    normal_mode: bool = False,
+    scale_factor: float = 1.0
+) -> np.ndarray:
+    
+    #ensure data is 2D
+    if not normal_mode and (data is None or data.ndim != 2):
+        return False
+    if normal_mode:
+        if data.ndim != 3:
+            return False
+        if data.shape[2] > 3:
+            return False
+    
+    # normalize the data to 8-bit range (0-255) for visualization
+    norm_data = np.clip((data - data_min) / data_range, 0, 1)
+    frame: np.ndarray | None = None
+
+    # encode each image dimension as normal map colors if specified
+    if normal_mode:
+
+        # separate rgb channels by data z slice
+        shape = norm_data.shape
+        r = norm_data[:,:,0]
+        g = (
+            np.zeros((shape[0], shape[1]))
+                if shape[2] <= 1 else 
+            norm_data[:,:,1] 
+        )
+        b = (
+            np.zeros((shape[0], shape[1]))
+                if shape[2] <= 2 else 
+            norm_data[:,:,2] 
+        )
+        
+        # write rgb to frame
+        rgb = np.zeros((shape[0], shape[1], 3))
+        rgb[:,:,0] = r
+        rgb[:,:,1] = g
+        rgb[:,:,2] = b
+        frame = (
+            IndexSchema.convert(rgb, IndexSchema.XYT, IndexSchema.XYT) * 
+            255.0
+        ).astype(np.uint8)
+    else:
+        frame = (map_rgb(norm_data) * 255.0).astype(np.uint8)
+
+    # convert to BGR for video
+    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    return frame_bgr
+
 def write_frame(
     data: np.ndarray, 
     video_writer: cv2.VideoWriter, 

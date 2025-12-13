@@ -1158,7 +1158,10 @@ def filter_displacements(
 	filter_count: int = 0
 	_, width, height = displacements.shape
 	for x in range(width):
+		if x == 0 or x == width-1: continue # not a real solution
 		for y in range(height):
+
+			if y == 0 or y == height-1: continue # not a real solution
 
 			# TODO: this fixes the edges being all fucked up if we just skip them
 			# if x == 0 or y == 0 or x == width - 1 or y == height - 1: continue
