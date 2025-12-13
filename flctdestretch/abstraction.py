@@ -635,7 +635,10 @@ def calc_difs(
     for index in range(file_count):
         data_a = load_image_data(in_filepaths1[index], z_index=None)
         data_b = load_image_data(in_filepaths2[index], z_index=None)
-        write_sequential_file(index, out_name_digits, out_dir, out_filename, data_a - data_b)
+        path = write_sequential_file(index, out_name_digits, out_dir, out_filename, data_a - data_b)
+        paths.append(path)
+    
+    return paths
 
 def calc_change_rate(
     in_filepaths: list[os.PathLike],
@@ -649,6 +652,8 @@ def calc_change_rate(
     specified data files, and output the results as new files in the 
     specified directory
     """
+
+    paths = []
 
     # meta info from files
     (file_count, out_name_digits, _) = get_filepaths_info(in_filepaths)
@@ -678,4 +683,7 @@ def calc_change_rate(
         
         # write flow to data file
         flow = loaded_data[-1] - loaded_data[0]
-        write_sequential_file(i, out_name_digits, out_dir, out_filename, flow)
+        path = write_sequential_file(i, out_name_digits, out_dir, out_filename, flow)
+        paths.append(path)
+    
+    return paths
