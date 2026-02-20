@@ -9,8 +9,8 @@ on implementation by Momchil Molnar
 import time
 import numpy as np
 from scipy import signal as signal
+from scipy.signal.windows import blackman
 from scipy.interpolate import RectBivariateSpline
-from typing import Tuple, Literal, Any
 
 # internal
 from destretch_types import DestretchParams, DestretchLoopResult
@@ -18,7 +18,7 @@ from destretch_types import DestretchParams, DestretchLoopResult
 
 ## Processing: ----------------------------------------------------------------|
 
-def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor=False):
+def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor=False) -> np.ndarray:
     """
     Bilinear interpolation (resampling)
     of the scene s at coordinates xy
@@ -101,8 +101,8 @@ def apod_mask(nx, ny, fraction=0.08):
     taper_wx = int(nx * min(fraction, 0.5))
     taper_wy = int(ny * min(fraction, 0.5))
 
-    filt_x = signal.windows.blackman(2 * taper_wx)
-    filt_y = signal.windows.blackman(2 * taper_wy)
+    filt_x = blackman(2 * taper_wx)
+    filt_y = blackman(2 * taper_wy)
 
     left = filt_x[:taper_wx]
     right = left[::-1]
@@ -355,7 +355,11 @@ def bilin_control_points(scene, rdisp, disp):
     return xy_grid_coords, xy_grid
 
 def destr_control_points(
-    reference, kernel, border_offset, spacing_ratio, mf=0.08
+    reference: np.ndarray, 
+    kernel: np.ndarray, 
+    border_offset: int, 
+    spacing_ratio: float, 
+    mf: float = 0.08
 ):
     """
     this function defines a regularly spaced grid on control points, which are
@@ -408,8 +412,8 @@ def destr_control_points(
     # The border_offset input variable defines this border area in relation to 
     #   the kernel size, but maybe it's better to define it as an absolute 
     #   number of pixels?
-    destr_info.border_x    = int(border_offset)
-    destr_info.border_y    = int(border_offset)
+    destr_info.border_x = int(border_offset)
+    destr_info.border_y = int(border_offset)
     # make sure [border_x,border_y] is divisible by 2
     if (destr_info.border_x % 2):
         destr_info.border_x = int(destr_info.border_x + 1)
@@ -685,6 +689,7 @@ def reg_loop(
     rdisp_sum    = np.zeros((2, scene_nx, scene_ny))
     kernel_count = 0.0
 
+    destr_info: DestretchParams | None = None
     for kernel_dim in kernel_sizes:
         scene_temp, disp, rdisp, destr_info = reg(scene_temp, ref, kernel_dim, mf, use_fft, adf2_pad, adf_pow, border_offset, spacing_ratio)
         # remap displacements onto spatial grid of scene 
@@ -695,6 +700,7 @@ def reg_loop(
         offsets_sum  += offsets_new
         rdisp_sum    += dispmap_new - offsets_new
         kernel_count += 1
+    assert destr_info is not None
 
     # destr_info.kx , ky - kernel size
     # use this, alongside spacing_ratio and border_size to reduce the 
@@ -740,7 +746,7 @@ def reg_loop_series(
     num_scenes = scene.shape[2]
     scene_d = np.zeros((scene.shape))
 
-    start = time()
+    start = time.time()
     num_kernels = len(kernel_sizes)
     windows = {}
     destr_info_d = {}
@@ -751,6 +757,8 @@ def reg_loop_series(
     # d_info, rdisp = destr_control_points(ref, kernel)
     # mm = mask(d_info.wx, d_info.wy)
     # smou = smouth(d_info.wx, d_info.wy)
+    rdisp: np.ndarray | None = None
+    destr_info: DestretchParams | None = None
     for kernel1 in kernel_sizes:
         kernel = np.zeros((kernel1, kernel1))
 
@@ -767,12 +775,14 @@ def reg_loop_series(
         win = doref(ref, mm, destr_info)
         # win = doref(ref, mm, destr_info, use_fft)
         windows[kernel1] = win
+    assert rdisp is not None
         
     disp_l = list(rdisp.shape)
     disp_l.append(num_scenes)
     disp_t = tuple(disp_l)
     disp_all = np.zeros(disp_t)
 
+    disp: np.ndarray | None = None
     for t in range(num_scenes):
         for k in kernel_sizes:
             (
@@ -790,13 +800,13 @@ def reg_loop_series(
             )
         disp_all[:, :, :, t] = disp
 
-    end = time()
+    end = time.time()
     print(f"Total elapsed time {(end - start):.4f} seconds.")
     ans = scene_d
 
     return ans, disp_all, rdisp, destr_info
 
-def doreg(scene, r, d, destr_info):
+def doreg(scene, r, d, destr_info) -> np.ndarray:
     """
     Parameters
     ----------
@@ -831,7 +841,7 @@ def reg(
         scene, ref, kernel_size, mf=0.08, 
         use_fft=False, adf_pad=0.25, adf_pow=2, 
         border_offset=4, spacing_ratio=0.5
-    ):
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, DestretchParams]:
     # TODO: clean up control point offset calculations - move FFT specific 
     # calls (e.g. apod) into conditional
     # TODO: (here and elsewhere) rename d_info to destr_info
@@ -885,7 +895,7 @@ def reg(
     ssz = scene.shape
     ans = np.zeros((ssz[0], ssz[1]), order="F")
 
-    if do_timing: start = time.time()
+    start = time.time()
 
     if use_fft:
         subfield_fftconj, subfields_images = doref(ref, apod_window, destr_info)

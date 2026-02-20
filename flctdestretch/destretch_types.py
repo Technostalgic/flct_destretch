@@ -4,19 +4,17 @@ on implementation by Momchil Molnar
 """
 
 import numpy as np
-from typing import Tuple, Literal, Any
-from dataclasses import dataclass
+from typing import Tuple, Literal, Any, NamedTuple
 
 ## Definitions: ---------------------------------------------------------------|
 
-@dataclass(frozen=True)
-class DestretchLoopResult:
+class DestretchLoopResult(NamedTuple):
     """
     Data type that's returned by the destretch loop, for tracking destretch state
     """
-    result: np.ndarray[Any, np.dtype[np.float64]]
-    displace_sum: np.ndarray[tuple[Literal[2], Any, Any], np.dtype[np.float64]]
-    ref_displace_sum: np.ndarray[tuple[Literal[2], Any, Any], np.dtype[np.float64]]
+    result: np.ndarray
+    displace_sum: np.ndarray | None
+    ref_displace_sum: np.ndarray | None
     destr_info: 'DestretchParams'
 
     def __iter__(self):
@@ -41,16 +39,21 @@ class DestretchParams():
     # boundary size x,y
     bx: int = 0
     by: int = 0
+
+    border_x: int = 0
+    border_y: int = 0
+    spacing_x: int = 0
+    spacing_y: int = 0
         
     # number of control points x,y
     cpx: int = 0
     cpy: int = 0
         
     # apodization percentage
-    mf: int = 0
+    mf: float = 0
 
     # array of control points
-    rcps: int = 0
+    rcps: np.ndarray | None = None
 
     # TODO describe these fields
     ref_sz_x: int = 0
@@ -63,7 +66,7 @@ class DestretchParams():
         
     # TODO describe these fields
     max_fit_method: int = 1
-    use_fft: bool = 0
+    use_fft: bool = True
     do_plots: bool = False
     debug: bool = False
 

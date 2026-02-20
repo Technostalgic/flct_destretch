@@ -1,5 +1,6 @@
 import os, time
-from typing import Callable, TypedDict, Any, Union
+from pathlib import Path
+from typing import Callable, TypedDict
 
 import numpy as np
 from scipy.ndimage import map_coordinates
@@ -45,9 +46,9 @@ class IterProcessArgs(TypedDict):
 ## Utility Funcs ---------------------------------------------------------------
 
 def fits_file_destretch_iter(
-        in_filepaths: list[os.PathLike],
+        in_filepaths: list[str],
         iter_func: Callable[[DestretchLoopResult], None],
-        ** kwargs: IterProcessArgs
+        ** kwargs
     ) -> None:
     """
     iterates over each data from each specified file and applies destretching
@@ -83,7 +84,7 @@ def fits_file_destretch_iter(
         path = in_filepaths[i]
         
         # get the image data from ref method if available otherwise load it
-        image_data: np.ndarray = ref_method.get_original_data(i)
+        image_data: np.ndarray | None = ref_method.get_original_data(i)
         if image_data is None:
             image_data = load_image_data(path)
 
@@ -102,14 +103,16 @@ def fits_file_destretch_iter(
         reference_image = ref_method.get_reference(i)
 
         # perform image destretching
-        print(f"processing image #{i}.." + in_filepaths[i])
-        result = reg_loop(
+        print(f"processing image #{i}.." + str(in_filepaths[i]))
+        result: DestretchLoopResult = reg_loop(
             image_data,
             reference_image,
             kernel_sizes,
             border_offset=border_offset,
             spacing_ratio=spacing_ratio
         )
+        assert result.displace_sum is not None
+        assert result.ref_displace_sum is not None
 
         # this introduces a non-insignificant computational overhead since we 
         # need to iterate over every control point
@@ -150,11 +153,11 @@ def fits_file_destretch_iter(
         iter_func(result)
 
 def fits_file_process_iter(
-        in_data_files: list[os.PathLike],
-        in_off_files: list[os.PathLike],
+        in_data_files: list[str],
+        in_off_files: list[str],
         iter_func: Callable[[DestretchLoopResult], None],
-        in_avg_files: list[os.PathLike] | None = None,
-        ** kwargs: IterProcessArgs
+        in_avg_files: list[str] | None = None,
+        ** kwargs
     ) -> None:
     """
     iterates over each data from each specified file and applies destretching
@@ -232,7 +235,7 @@ def fits_file_process_iter(
 
         # invert the offset data and apply it as a correction to destretch the original image
         corrected_off_data = -off_data if avg_data is None else avg_data - off_data 
-        result = (
+        result = DestretchLoopResult(
             doreg(
                 image_data, 
                 rdisp,
@@ -253,7 +256,7 @@ def write_sequential_file(
     out_dir: str, 
     base_name: str,
     data: np.ndarray
-) -> os.PathLike:
+) -> str:
     out_num = f"{index:0{digits}}"
     out_path = os.path.join(
         out_dir, 
@@ -263,8 +266,8 @@ def write_sequential_file(
     return out_path
 
 def get_filepaths_info(
-    in_filepaths: list[os.PathLike]
-) -> tuple[int, int, Union[int, tuple[int, ...]]]:
+    in_filepaths: list[str]
+) -> tuple[int, int, tuple[int, ...]]:
     
     file_count = len(in_filepaths)
     out_name_digits: int = len(str(file_count))
@@ -300,13 +303,13 @@ def resize_vector_map(
 ## Module Funcitonality --------------------------------------------------------
 
 def destretch_files(
-        in_data_files: list[os.PathLike],
-        in_off_files: list[os.PathLike],
-        out_dir: os.PathLike,
+        in_data_files: list[str],
+        in_off_files: list[str],
+        out_dir: str,
         out_filename: str = "destretched",
-        in_avg_files: list[os.PathLike] | None = None,
-        ** kwargs: IterProcessArgs
-    ) -> list[os.PathLike]:
+        in_avg_files: list[str] | None = None,
+        ** kwargs
+    ) -> list[str]:
     """
     Compute the destretched result of data from all given files, and export to 
     new files
@@ -326,7 +329,7 @@ def destretch_files(
         see IterProcessArgs class for all available arguments
     """
 
-    out_paths: list[os.PathLike] = []
+    out_paths: list[str] = []
     start_at: int = kwargs.get("start_at", 0)
 
     # start timing 
@@ -381,11 +384,11 @@ def destretch_files(
     return out_paths
 
 def calc_offset_vectors(
-        in_filepaths: list[os.PathLike],
+        in_filepaths: list[str],
         out_dir: os.PathLike,
         out_filename: str = "offsets",
-        ** kwargs: IterProcessArgs
-    ) -> list[os.PathLike]:
+        ** kwargs
+    ) -> list[str]:
     """
     calcuates the offset vectors from destretching and outputs each of them as 
     .fits files
@@ -403,7 +406,7 @@ def calc_offset_vectors(
     """
 
     start_at: int = kwargs.get("start_at", 0)
-    out_paths: list[os.PathLike] = []
+    out_paths: list[str] = []
 
     # number of digits needed to accurately order the output files
     out_name_digits: int = len(str(len(in_filepaths)))
@@ -419,6 +422,7 @@ def calc_offset_vectors(
 
         # use final displacement sum 'disp_sum' - 'rdisp_sum'
         _, disp_sum, rdisp_sum, _ = result
+        assert disp_sum is not None
         offsets = disp_sum - rdisp_sum
 
         # output the vectors as a new fits file
@@ -436,14 +440,14 @@ def calc_offset_vectors(
     return out_paths
 
 def calc_rolling_mean(
-        in_filepaths: list[os.PathLike],
+        in_filepaths: list[str],
         out_dir: os.PathLike,
         out_filename: str = "avg",
         window_left: int = 5,
         window_right: int = 5,
         end_behavior: WindowEdgeBehavior = WindowEdgeBehavior.KEEP_RANGE,
-        ** kwargs: IterProcessArgs
-    )-> list[os.PathLike]:
+        ** kwargs
+    )-> list[str]:
     """
     TODO this function needs to be revised, end behavior of trim margin seems 
     to break it
@@ -468,12 +472,12 @@ def calc_rolling_mean(
     end_behavior:
         how the function decides what data to use for the margin when it 
         collides with an edge of the data list
-    ** kwargs: 
+    ** kwargs: in_filepaths
         see IterProcessArgs class for all available arguments
     """
 
     # store output paths to return
-    out_paths: list[os.PathLike] = []
+    out_paths: list[str] = []
 
     # ensure output directory exists
     if not os.path.exists(out_dir):
@@ -584,14 +588,14 @@ def calc_rolling_mean(
     return out_paths
 
 def calc_cumulative_sums(
-    in_filepaths: list[os.PathLike],
-    out_dir: os.PathLike,
+    in_filepaths: list[str],
+    out_dir: str,
     out_filename: str = "cumulative_off"
-) -> list[os.PathLike]:
+) -> list[str]:
     
     # meta info from files
     (file_count, out_name_digits, image_resolution) = get_filepaths_info(in_filepaths)
-    paths: list[os.PathLike] = []
+    paths: list[str] = []
 
     # ensure output directory exists
     if not os.path.exists(out_dir):
@@ -612,11 +616,11 @@ def calc_cumulative_sums(
     return paths
 
 def calc_difs(
-    in_filepaths1: list[os.PathLike],
-    in_filepaths2: list[os.PathLike],
-    out_dir: os.PathLike,
+    in_filepaths1: list[str],
+    in_filepaths2: list[str],
+    out_dir: str,
     out_filename: str = "dif"
-) -> list[os.PathLike]:
+) -> list[str]:
     """
     Subtract the data in in_filepaths2 from the data in in_filepaths1, store 
     results at specified directory and filename
@@ -624,7 +628,7 @@ def calc_difs(
     
     # meta info from files
     (file_count, out_name_digits, image_resolution) = get_filepaths_info(in_filepaths1)
-    paths: list[os.PathLike] = []
+    paths: list[str] = []
 
     # ensure output directory exists
     if not os.path.exists(out_dir):
@@ -633,15 +637,18 @@ def calc_difs(
     for index in range(file_count):
         data_a = load_image_data(in_filepaths1[index], z_index=None)
         data_b = load_image_data(in_filepaths2[index], z_index=None)
-        write_sequential_file(index, out_name_digits, out_dir, out_filename, data_a - data_b)
+        path = write_sequential_file(index, out_name_digits, str(out_dir), out_filename, data_a - data_b)
+        paths.append(path)
+    
+    return paths
 
 def calc_change_rate(
-    in_filepaths: list[os.PathLike],
-    out_dir: os.PathLike,
+    in_filepaths: list[str],
+    out_dir: str,
     out_filename: str = "flow",
     window_size: int = 5,
     end_behavior: WindowEdgeBehavior = WindowEdgeBehavior.KEEP_RANGE
-) -> list[os.PathLike]:
+) -> list[str]:
     """
     Calculate the rate of change between intervals of window_size in the 
     specified data files, and output the results as new files in the 
@@ -660,6 +667,7 @@ def calc_change_rate(
     loaded_data_off: int = 0
 
     # calculate rate at each step and write to file
+    paths: list[str] = []
     for i in range(file_count):
         imin, imax = end_behavior.clamp(file_count, i - window_size, i + window_size + 1)
         irange = imax - imin
@@ -676,4 +684,7 @@ def calc_change_rate(
         
         # write flow to data file
         flow = loaded_data[-1] - loaded_data[0]
-        write_sequential_file(i, out_name_digits, out_dir, out_filename, flow)
+        path = write_sequential_file(i, out_name_digits, out_dir, out_filename, flow)
+        paths.append(path)
+
+    return paths

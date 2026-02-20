@@ -9,8 +9,8 @@ from utility import IndexSchema, load_image_data
 ## Utility Types ---------------------------------------------------------------
 
 class WindowEdgeBehavior(enum.Enum):
-    KEEP_RANGE: int = 0
-    TRIM_MARGINS: int = 1
+    KEEP_RANGE = 0
+    TRIM_MARGINS = 1
 
     def clamp(self, max_range: int, minval: int, maxval: int) -> tuple[int, int]:
         """
@@ -46,9 +46,9 @@ class RefMethod(abc.ABC):
     algorithm is defined or calculated - abstract class
     """
     
-    filepaths: list[os.PathLike] = []
+    filepaths: list[str] = []
 
-    def __init__(self, filepaths: list[os.PathLike] = []):
+    def __init__(self, filepaths: list[str] = []):
         """
         Do not use this - instead use the static 'create' method
 
@@ -93,7 +93,7 @@ class PreviousRef(RefMethod):
     for preprocessing the data and then performing additional calculations
     """
 
-    def __init__(self, filepaths: list[os.PathLike]):
+    def __init__(self, filepaths: list[str]):
         super().__init__(filepaths)
         self.previous_data: np.ndarray | None = None
         self.cur_data: np.ndarray | None = None
@@ -186,7 +186,7 @@ class RollingWindow(RefMethod):
 
     def process_index(self,
         current_index: int,
-        original_image: np.ndarray = None
+        original_image: np.ndarray | None = None
     ):
         # calculate the local margin values
         window_min, window_max = self.edge_behavior.clamp(
@@ -205,7 +205,7 @@ class RollingWindow(RefMethod):
         for i in range(window_min, window_max):
             local_index = i - self.original_data_off
             if local_index >= len(self.original_data):
-                data: np.ndarray = None
+                data: np.ndarray | None = None
                 if i == current_index and original_image is not None:
                     data = original_image
                 else:

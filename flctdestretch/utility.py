@@ -6,8 +6,6 @@ import numpy as np
 import astropy.io.fits as fits
 from astropy.io.fits.hdu import HDUList, ImageHDU, CompImageHDU
 
-fits_regex = re.compile("^.*\.fits$")
-
 class IndexSchema(enum.Enum):
     """
     Represents an index schema for an np.ndarray, showing which index in the 
@@ -82,7 +80,7 @@ class IndexSchema(enum.Enum):
         return np.transpose(input, axes=permute_order)
 
 def load_image_data(
-        path: os.PathLike, 
+        path: os.PathLike | str, 
         hdu_index: int | None = None,
         z_index: int | None = 0
     ) -> np.ndarray:
@@ -105,18 +103,20 @@ def load_image_data(
     """
     # select the correct hdu by the specified hdu index
     hdus: HDUList = fits.open(path)
-    hdu: ImageHDU | CompImageHDU = None
+    hdu: ImageHDU | CompImageHDU | None = None
     if hdu_index is None:
         for unit in hdus:
-            if (
-                unit.data is not None or 
-                unit is ImageHDU or 
-                unit is CompImageHDU
-            ):
+            if (isinstance(unit, (ImageHDU, CompImageHDU))):
                 hdu = unit
                 break
-    else: hdu = hdus[hdu_index]
+    else: 
+        item = hdus[hdu_index]
+        if isinstance(item, (ImageHDU, CompImageHDU)):
+            hdu = item
     
+    assert hdu is not None
+    assert hdu.data is not None
+
     # transform the image data from the data in the fits file
     image_data: np.ndarray = hdu.data
 
@@ -126,14 +126,14 @@ def load_image_data(
     
     return image_data
 
-def get_fits_paths(in_dir: os.PathLike, sort: bool = True) -> list[str]:
+def get_fits_paths(in_dir: os.PathLike | str, sort: bool = True) -> list[str]:
     """
     gets all the paths to the fits files in a directory. By default, sorted a-z
     """
     paths = [
         os.path.join(in_dir, filename)
         for filename in os.listdir(in_dir)
-        if fits_regex.match(filename)
+        if filename.lower().endswith(".fits")
     ]
     if sort: paths.sort()
     return paths
