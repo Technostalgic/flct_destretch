@@ -17,6 +17,7 @@ import numpy as np
 # internal
 from abstraction import *
 from utility import get_fits_paths
+from fits_to_mp4 import fits_to_mp4
 
 ## Fetch Data ------------------------------------------------------------------
 
@@ -28,8 +29,8 @@ print(f"{len(files)} files found")
 
 # variables for destretching config
 kernel_sizes: np.ndarray[np.int64] = np.array([128, 64])
-rolling_mean_window_size: int = 5
-flowmap_window_size: int = 5
+rolling_mean_window_size: int = 3
+flowmap_window_size: int = 2
 
 # in case it fails partway through destretching, you can set this to start at 
 # the nth file, where n is the index of the last file that was successfully 
@@ -106,3 +107,20 @@ result = destretch_files(
 
 elapsed = time.time() - start
 print(f"Demo complete! \nTotal elapsed time: {elapsed}")
+
+# output video files
+out_file_orig_vid = os.path.join(files_dir, "video_original.mp4")
+out_file_destr_vid = os.path.join(files_dir, "video_destretched.mp4")
+out_file_flow_vid = os.path.join(files_dir, "video_flowmap.mp4")
+out_file_off_vid = os.path.join(files_dir, "video_offmap.mp4")
+out_file_off_final_vid = os.path.join(files_dir, "video_offmap_final.mp4")
+
+# output results as video files
+scale = 16
+fits_to_mp4(get_fits_paths(out_flow_dir), out_file_flow_vid, 60, "copper", IndexSchema.TYX, 0.2, 1.25, True, scale_factor=scale)
+fits_to_mp4(get_fits_paths(out_dir), out_file_destr_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25)
+fits_to_mp4(files, out_file_orig_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25)
+fits_to_mp4(get_fits_paths(out_off_dir), out_file_off_vid, 60, "copper", IndexSchema.TYX, 0.2, 1.25, True, scale_factor=scale)
+fits_to_mp4(get_fits_paths(out_off_final_dir), out_file_off_final_vid, 60, "copper", IndexSchema.TYX, 0.2, 1.25, True, scale_factor=scale)
+
+print("Demo Complete!")
