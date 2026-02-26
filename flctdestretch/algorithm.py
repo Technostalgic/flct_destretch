@@ -532,43 +532,49 @@ def controlpoint_offsets_fft(
 		X and Y offsets for control points
 
 	"""
-	subfield_offsets = np.zeros((2, destr_info.cpx, destr_info.cpy), order="F")
 
-	# number of array elements in each subfield
-	nels = destr_info.kx * destr_info.ky
-
+	# stores the offsets calculated for each subwindow against reference
+	# should be (y, x) instead?
+	offsets = np.zeros((2, destr_info.cpx, destr_info.cpy), order="F") 
+	
+	# iterate through each control point
 	for j in range(0, destr_info.cpy):
- 
 		for i in range(0, destr_info.cpx):
 
-			sub_strt_x  = int(destr_info.rcps[0,i,j] - destr_info.kx/2)
-			sub_end_x   = int(sub_strt_x + destr_info.kx - 1)
+			# determine edges of subwindow
+			start_x = int(destr_info.rcps[0, i, j] - destr_info.kx / 2)
+			end_x = int(start_x + destr_info.kx - 1)
+			start_y = int(destr_info.rcps[1, i, j] - destr_info.ky / 2)
+			end_y = int(start_y + destr_info.ky - 1)
 
-			sub_strt_y  = int(destr_info.rcps[1,i,j] - destr_info.ky/2)
-			sub_end_y   = int(sub_strt_y + destr_info.ky - 1)
+			# create scene subwindow
+			subscene = scene[
+				start_x : end_x + 1,
+				start_y : end_y + 1
+			].copy()
+			subscene -= surface_fit(subscene, destr_info.subfield_correction)
+			
+			# apply fft and multiply by reference conjugate
+			subscene_fft = np.array(np.fft.fft2(subscene * apod_window), order="F")
+			subscene_fft *= subfield_fftconj[:, :, i, j] * lowpass_filter
 
-			#cross correlation, inline
-			scene_subarr = scene[sub_strt_x:sub_end_x+1, sub_strt_y:sub_end_y+1].copy()
+			# get correlation from reversing fft
+			subscene_ifft = np.abs(np.fft.ifft2(subscene_fft), order="F")
+			correlation = np.roll(
+				subscene_ifft, 
+				# should this be (y, x) instead?
+				(destr_info.kx / 2, destr_info.ky / 2), 
+				axis=(0, 1)
+			)
+			correlation = np.array(correlation, order="F")
 
-			scene_subarr -= surface_fit(scene_subarr, destr_info.subfield_correction)
-
-			scene_subarr_fft = np.array(np.fft.fft2(scene_subarr * apod_window), order="F")
-			scene_subarr_fft = scene_subarr_fft  * subfield_fftconj[:, :, i, j] * lowpass_filter
-		
-			scene_subarr_ifft = np.abs(np.fft.ifft2(scene_subarr_fft), order="F")
-			cc = np.roll(scene_subarr_ifft, (int(destr_info.kx/2), int(destr_info.ky/2)), axis=(0, 1))
-			#cc = np.fft.fftshift(scene_subarr_ifft)
-			cc = np.array(cc, order="F")
-
-			#print("Crosscorrelation Maxpos Order: ", destr_info.max_fit_method)
-
-			ymax, xmax = crosscor_maxpos(cc, destr_info.max_fit_method)
-			#print(cc.shape, ymax, xmax)
-
-			subfield_offsets[0,i,j] = sub_strt_x + xmax
-			subfield_offsets[1,i,j] = sub_strt_y + ymax
-
-	return subfield_offsets
+			# store the max correlation position
+			# should the offsets be indexed from y initially, and then x?
+			ymax, xmax = crosscor_maxpos(correlation, destr_info.max_fit_method)
+			offsets[0, i, j] = start_x + xmax
+			offsets[1, i, j] = start_y + ymax
+	
+	return offsets
 
 def controlpoint_offsets_adf(
 	scene, reference, destr_info, 
