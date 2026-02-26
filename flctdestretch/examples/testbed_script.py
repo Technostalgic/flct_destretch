@@ -58,40 +58,40 @@ calc_offset_vectors(
 	out_off_dir,
 	"off",
 	kernel_sizes=kernel_sizes,
-    start_at=start_index,
+	start_at=start_index,
 )
 
 # calculate the cumulative sum offsets
 print(f"calculating cumulative sums... {out_sum_dir}")
 calc_cumulative_sums(
-    get_fits_paths(out_off_dir),
-    out_sum_dir,
+	get_fits_paths(out_off_dir),
+	out_sum_dir,
 )
 
 # calculate the rolling sums of the cumulative sum offsets
 print(f"calculating rolling mean... {out_avg_dir}")
 calc_rolling_mean(
-    get_fits_paths(out_sum_dir),
-    out_avg_dir,
-    window_left=rolling_mean_window_size,
-    window_right=rolling_mean_window_size,
+	get_fits_paths(out_sum_dir),
+	out_avg_dir,
+	window_left=rolling_mean_window_size,
+	window_right=rolling_mean_window_size,
 )
 
 # calculate the difs
 print(f"calculating final offs... {out_off_final_dir}")
 calc_difs(
-    get_fits_paths(out_sum_dir),
-    get_fits_paths(out_avg_dir),
-    out_off_final_dir,
-    "final",
+	get_fits_paths(out_sum_dir),
+	get_fits_paths(out_avg_dir),
+	out_off_final_dir,
+	"final",
 )
 
 # calculate the flowmap
 print(f"generating flow map data... {out_flow_dir}")
 calc_change_rate(
-    get_fits_paths(out_avg_dir),
-    out_flow_dir,
-    window_size=flowmap_window_size,
+	get_fits_paths(out_avg_dir),
+	out_flow_dir,
+	window_size=flowmap_window_size,
 )
 
 # apply the final offset vectors to destretch the image data
