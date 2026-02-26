@@ -4,7 +4,7 @@ import enum
 
 import numpy as np
 import astropy.io.fits as fits
-from astropy.io.fits.hdu import HDUList, ImageHDU, CompImageHDU
+from astropy.io.fits.hdu import HDUList, ImageHDU, CompImageHDU, PrimaryHDU
 
 class IndexSchema(enum.Enum):
 	"""
@@ -103,15 +103,15 @@ def load_image_data(
 	"""
 	# select the correct hdu by the specified hdu index
 	hdus: HDUList = fits.open(path)
-	hdu: ImageHDU | CompImageHDU | None = None
+	hdu: ImageHDU | CompImageHDU | PrimaryHDU | None = None
 	if hdu_index is None:
 		for unit in hdus:
-			if (isinstance(unit, (ImageHDU, CompImageHDU))):
+			if (isinstance(unit, (PrimaryHDU, ImageHDU, CompImageHDU))):
 				hdu = unit
 				break
 	else: 
 		item = hdus[hdu_index]
-		if isinstance(item, (ImageHDU, CompImageHDU)):
+		if (isinstance(unit, (PrimaryHDU, ImageHDU, CompImageHDU))):
 			hdu = item
 	
 	assert hdu is not None

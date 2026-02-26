@@ -504,9 +504,12 @@ def destr_control_points(
 	return destr_info, rcps
 
 def controlpoint_offsets_fft(
-		scene, subfield_fftconj, apod_window, 
-		lowpass_filter, destr_info
-	):
+		scene: np.ndarray, 
+		subfield_fftconj: np.ndarray, 
+		apod_window: np.ndarray, 
+		lowpass_filter: np.ndarray, 
+		destr_info: DestretchParams
+	) -> np.ndarray:
 	"""
 	Locate control points
 
@@ -553,8 +556,7 @@ def controlpoint_offsets_fft(
 			scene_subarr_fft = scene_subarr_fft  * subfield_fftconj[:, :, i, j] * lowpass_filter
 		
 			scene_subarr_ifft = np.abs(np.fft.ifft2(scene_subarr_fft), order="F")
-			cc = np.roll(scene_subarr_ifft, (int(destr_info.kx/2), int(destr_info.ky/2)),
-							axis=(0, 1))
+			cc = np.roll(scene_subarr_ifft, (int(destr_info.kx/2), int(destr_info.ky/2)), axis=(0, 1))
 			#cc = np.fft.fftshift(scene_subarr_ifft)
 			cc = np.array(cc, order="F")
 
