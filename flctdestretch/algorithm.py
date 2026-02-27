@@ -638,34 +638,6 @@ def reg_loop(
 
 	return DestretchLoopResult(ans, displacement_sum, rdisp_sum, destr_info)
 
-def doreg(
-	scene: np.ndarray, 
-	ref_disp: np.ndarray, 
-	disp: np.ndarray, 
-) -> np.ndarray:
-	"""
-	Parameters
-	----------
-	scene : 2D Scalar Array
-		Scene to be destretched
-	ref_disp : 2D Vector Array
-		reference displacements of the control points
-	disp : 2D Vector Array
-		Actual displacements of the control points
-	destr_info: DestretchParams
-		Destretch information
-
-	Returns
-	-------
-	ans : Array
-		Destretched scene.
-	"""
-
-	xy, _ = bilin_control_points(scene, ref_disp, disp)
-	ans = bilin_values_scene(scene, xy, nearest_neighbor=False)
-
-	return ans
-
 def reg(
 	scene: np.ndarray, ref: np.ndarray, kernel_size: list[int], 
 	mf: float = 0.08, border_offset: int = 4, spacing_ratio: float = 0.5
@@ -721,19 +693,36 @@ def reg(
 		dtime = time.time() - start
 		print(f"Time for a scene destretch is {dtime:.3f}")
 
-	#disp = repair(rdisp, disp, d_info) # optional repair
-	#rms = sqrt(total((rdisp - disp)^2)/n_elements(rdisp))
-	#print, 'rms =', rms
-	#mdisp = np.mean(rdisp-disp,axis=(1, 2))
-	#disp[0, :, :] += mdisp[0]
-	#disp[1, :, :] += mdisp[1]
 	x = doreg(scene, rdisp, disp)
 	ans = x
 
-	# print(f"Total destr took: {(end - start):.5f} seconds for kernel"
- 	# 	+f"of size {kernel_size} px.")
-
 	return ans, disp, rdisp, destr_info
+
+def doreg(
+	scene: np.ndarray, 
+	ref_disp: np.ndarray, 
+	disp: np.ndarray, 
+) -> np.ndarray:
+	"""
+	Parameters
+	----------
+	scene : 2D Scalar Array
+		Scene to be destretched
+	ref_disp : 2D Vector Array
+		reference displacements of the control points
+	disp : 2D Vector Array
+		Actual displacements of the control points
+
+	Returns
+	-------
+	ans : Array
+		Destretched scene.
+	"""
+
+	xy, _ = bilin_control_points(scene, ref_disp, disp)
+	ans = bilin_values_scene(scene, xy, nearest_neighbor=False)
+
+	return ans
 
 def doref(
 	ref_image: np.ndarray, 
