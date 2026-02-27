@@ -165,44 +165,6 @@ def smouth(nx, ny):
 
 	return mm
 
-def crosscor_maxpos(cc, max_fit_method=1):
-	"""
-	TODO docstring
-	"""
-	mx  = np.amax(cc)
-	loc = cc.argmax()
-
-	ccsz = cc.shape
-	ymax = loc % ccsz[0]
-	xmax = loc // ccsz[0]
-
-	#a more complicated interpolation
-	#(from Niblack, W: An Introduction to Digital Image Processing, p 139.)
-
-	if xmax*ymax > 0 and xmax < (ccsz[0]-1) and ymax < (ccsz[1]-1):
-		if max_fit_method == 1:
-			denom = 2 * mx - cc[xmax-1,ymax] - cc[xmax+1,ymax]
-			xfra = (xmax-1/2) + (mx-cc[xmax-1,ymax])/denom
-
-			denom = 2 * mx - cc[xmax,ymax-1] - cc[xmax,ymax+1]
-			yfra = (ymax-1/2) + (mx-cc[xmax,ymax-1])/denom
-
-			xmax=xfra
-			ymax=yfra
-		elif max_fit_method == 2:
-			a2 = (cc[xmax+1, ymax] - cc[xmax-1, ymax])/2.
-			a3 = (cc[xmax+1, ymax]/2. - cc[xmax, ymax] + cc[xmax-1, ymax]/2.)
-			a4 = (cc[xmax, ymax+1] - cc[xmax, ymax-1])/2.
-			a5 = (cc[xmax, ymax+1]/2. - cc[xmax, ymax] + cc[xmax, ymax-1]/2.)
-			a6 = (cc[xmax+1, ymax+1] - cc[xmax+1, ymax-1] 
-				- cc[xmax-1, ymax+1] + cc[xmax-1, ymax-1])/4.
-			xdif = (2*a2*a5 - a4*a6) / (a6**2 - 4*a3*a5)
-			ydif = (2*a3*a4 - a2*a6) / (a6**2 - 4*a3*a5)
-			xmax = xmax + xdif
-			ymax = ymax + ydif
-
-	return ymax, xmax
-
 def correlation_maxpos_vectorized(
 		correlations: np.ndarray, 
 		max_fit_method: int = 1
@@ -663,90 +625,6 @@ def controlpoint_offsets_fft(
 
 	return offsets
 
-def controlpoint_offsets_adf(
-	scene, reference, destr_info, 
-	adf_pad=0.25, adf_pow=2
-):
-	# TODO: check that this works, is called from reg, clean up arguments
-	# TODO: make work with reference subfields
-	# TODO: add a "power" option - so it can compute both ADF and ADF^2
-	# #def cploc(s, w, apod_mask, smou, d_info, adf2_pad=0.25):
-	"""
-	Locate control points
-
-	Parameters
-	----------
-	scene : array
-		a 2-dimensional array (L x M) containing the image to be registered
-	reference : array
-		the reference array
-	destr_info : structure
-		Destretch information
-	adf_pad : float or int
-		If float between 0 and 1, fraction of subfield by which to shift
-		If int > 0, number of pixels by which to shift
-	adf_pow : int
-		Exponent for ADF function. 1 for ADF, 2 for ADF^2
-
-	Returns
-	-------
-	subfield_offsets : array
-		X and Y offsets for control points
-
-	"""
-	subfield_offsets = np.zeros((2, destr_info.cpx, destr_info.cpy), order="F")
-
-	# number of array elements in each subfield
-	# nels = destr_info.kx * destr_info.ky
-
-	if adf_pad < 1:
-		pad_x = int(destr_info.kx * adf_pad)
-		pad_y = int(destr_info.ky * adf_pad)
-	elif adf_pad > 1:
-		pad_x = int(adf_pad)
-		pad_y = int(adf_pad)
-	else:
-		raise TypeError("adf_pad must be int or float > 0")
-
-	for j in range(0, destr_info.cpy):
-
-		for i in range(0, destr_info.cpx):
-
-			sub_strt_x  = int(destr_info.rcps[0,i,j] - destr_info.kx/2)
-			sub_end_x   = int(sub_strt_x + destr_info.kx - 1)
-
-			sub_strt_y  = int(destr_info.rcps[1,i,j] - destr_info.ky/2)
-			sub_end_y   = int(sub_strt_y + destr_info.ky - 1)
-
-			#scene_subarr = scene[lx-pad_x:hx+pad_x, ly-pad_y:hy+pad_y]
-			scene_subarr = scene[sub_strt_x-pad_x:sub_end_x+pad_x+1,
-								 sub_strt_y-pad_y:sub_end_y+pad_y+1].copy()
-			ref_subarr = reference[sub_strt_x:sub_end_x+1,
-								   sub_strt_y:sub_end_y+1].copy()
-			
-			#print((scene_subarr[m:m+destr_info.kx, n:n+destr_info.ky]).shape)
-			#print(ref_subarr.shape)
-
-			cc = np.zeros((2*pad_x + 1, 2*pad_y + 1), order="F")
-			for m in range(2*pad_x + 1):
-				for n in range(2*pad_y + 1):
-					#print(m,m+destr_info.kx, n,n+destr_info.ky )
-					cc[m, n] = -np.sum(np.abs(scene_subarr[m:m+destr_info.kx, n:n+destr_info.ky]
-											  - ref_subarr))**adf_pow
-#                cc4 = np.zeros((2*pad_x + 1, 2*pad_y + 1, d_info.wx, d_info.wy))
-#                for m in range(2*pad_x + 1):
-#                    for n in range(2*pad_y + 1):
-#                        cc4[m, n] = ss[m:m+d_info.wx, n:n+d_info.wy]
-#                cc = -np.sum(np.abs(cc4 - w[:, :, i, j]), (2, 3))**2
-
-			xmax, ymax = crosscor_maxpos(cc, destr_info.max_fit_method)
-
-			subfield_offsets[0,i,j] = sub_strt_x + destr_info.kx/2 + xmax - pad_x
-			subfield_offsets[1,i,j] = sub_strt_y + destr_info.ky/2 + ymax - pad_y
-
-	return subfield_offsets
-
-
 ## Regularization -------------------------------------------------------------|
 
 def reg_loop(
@@ -992,12 +870,8 @@ def reg(
 
 	start = time.time()
 
-	if use_fft:
-		subfield_fftconj, subfields_images = doref(ref, apod_window, destr_info)
-		# print(scene.shape, apod_window.shape, smou.shape, destr_info)
-		disp = controlpoint_offsets_fft(scene, subfield_fftconj, apod_window, smou, destr_info)
-	else:
-		disp = controlpoint_offsets_adf(scene, ref, destr_info, adf_pad, adf_pow)
+	subfield_fftconj, _ = doref(ref, apod_window, destr_info)
+	disp = controlpoint_offsets_fft(scene, subfield_fftconj, apod_window, smou, destr_info)
 	
 	if do_timing: 
 		dtime = time.time() - start
