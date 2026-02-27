@@ -227,64 +227,6 @@ def correlation_maxpos_vectorized(
 		case _:
 			raise NotImplementedError
 
-def surface_fit(points_array, order=0):
-	"""
-	Fit a polynomial surface to a 2-D array of values.
-	
-	Parameters
-	----------
-	points_array : a 2-dimensional array (L x M) of points
-			to which a plane will be fit
-	order : maximum exponent of polynomial
-	
-	Returns
-	-------
-	surface_array : a 2-dimensional array (L x M) of points
-			representing the best-fit surface
-	"""
-	
-	if order == 0:
-		# Fitting with only mean, equivalent to order 0 polynomial
-		surface_array = np.ones(points_array.shape) * points_array.mean()
-		return surface_array
-		
-	elif order == 1:
-		# Analytical solution for plane using linear algebra
-		# grid points in X,Y
-		L, M = points_array.shape
-		X1, X2 = np.mgrid[:L, :M]
-		# reshape independent variables into form [a, b*X1, c*X2]
-		X = np.hstack((np.ones((L*M, 1)), X1.reshape((L*M, 1)), X2.reshape((L*M, 1))))
-		# reshape dependent variable into column vector
-		YY = points_array.reshape((L*M, 1))
-		# calculate normal vector of plane: theta = [X.T X]^-1 X.T YY
-		theta = np.dot(np.dot(np.linalg.pinv(np.dot(X.T, X)), X.T), YY)
-		# obtain fitted plane: plane_points = X ⋅ theta
-		surface_array = np.dot(X, theta).reshape((L, M))
-		
-		return surface_array
-		
-	else:
-		# Linear least-squares fitting, minimize A ⋅ x - b
-		# grid points in X,Y
-		L, M = points_array.shape
-		x, y = np.mgrid[:L, :M]
-		# define matrix of coefficients for polynomial (x in matrix equation)
-		coeffs = np.ones((order+1, order+1))
-		# matrix of independent variables, one term (x^m y^n) per column
-		a = np.zeros((x.size, coeffs.size))
-		for index, (j, i) in enumerate(np.ndindex(coeffs.shape)):
-			arr = coeffs[i, j] * x**i * y**j
-			a[:, index] = arr.ravel()
-		# perform least-squares fit
-		fit = np.linalg.lstsq(a, points_array.ravel(), rcond=None)
-		# obtain polynomial coefficients in array form
-		fit_coeffs = fit[0].reshape(coeffs.shape)
-		# obtain surface defined by polynomial with fitted coefficients
-		surface_array = np.polynomial.polynomial.polyval2d(x, y, fit_coeffs)
-		
-		return surface_array
-
 def surface_fit_vectorized(subwindows: np.ndarray, order: int = 0) -> np.ndarray:
 	"""
 	fit a polynomial surface against each subwindow in an array of 2D arrays
@@ -300,7 +242,20 @@ def surface_fit_vectorized(subwindows: np.ndarray, order: int = 0) -> np.ndarray
 
 		# order 1 - plane surface fit
 		case 1:
-			# TODO
+			# TODO vectorize
+			# # Analytical solution for plane using linear algebra
+			# # grid points in X,Y
+			# L, M = subwindows.shape
+			# X1, X2 = np.mgrid[:L, :M]
+			# # reshape independent variables into form [a, b*X1, c*X2]
+			# X = np.hstack((np.ones((L*M, 1)), X1.reshape((L*M, 1)), X2.reshape((L*M, 1))))
+			# # reshape dependent variable into column vector
+			# YY = subwindows.reshape((L*M, 1))
+			# # calculate normal vector of plane: theta = [X.T X]^-1 X.T YY
+			# theta = np.dot(np.dot(np.linalg.pinv(np.dot(X.T, X)), X.T), YY)
+			# # obtain fitted plane: plane_points = X ⋅ theta
+			# surface_array = np.dot(X, theta).reshape((L, M))
+			# return surface_array
 			raise NotImplementedError()
 
 		# higher orders are not feasible to vectorize
@@ -557,7 +512,8 @@ def controlpoint_offsets_fft(
 	destr_info: DestretchParams
 ) -> np.ndarray:
 	"""
-	Locate control points
+	Calculate the offsets of the control points in the reference frame, which 
+	can be determined from the subfield fft cojugates passed in here
 
 	Parameters
 	----------
@@ -576,7 +532,6 @@ def controlpoint_offsets_fft(
 	-------
 	subfield_offsets : array
 		X and Y offsets for control points
-
 	"""
 
 	kernel_width, kernel_height = destr_info.kx, destr_info.ky
@@ -699,94 +654,6 @@ def reg_loop(
 
 	return DestretchLoopResult(ans, disp_sum, rdisp_sum, destr_info)
 
-def reg_loop_series(
-		scene, ref, kernel_sizes, mf=0.08, 
-		use_fft=False, adf2_pad=0.25, border_offset=4, spacing_ratio=0.5
-	):
-	"""
-	TODO description
-	Depricated?
-	
-	Parameters
-	----------
-	scene : ndarray (nx, ny, nt)
-		Image to be destretched
-	ref : ndarray (nx, ny)
-		Reference image
-	kernel_sizes : ndarray (n_kernels)
-		Sizes of the consecutive kernels to be applied
-
-	Returns
-	-------
-	ans : ndarray (nx, ny)
-		Destretched scene
-	destr_info: Destretch class
-		Parameters of the destretching
-	"""
-
-	num_scenes = scene.shape[2]
-	scene_d = np.zeros((scene.shape))
-
-	start = time.time()
-	num_kernels = len(kernel_sizes)
-	windows = {}
-	destr_info_d = {}
-	mm_d = {}
-	smou_d = {}
-	rdisp_d = {}
-
-	# d_info, rdisp = destr_control_points(ref, kernel)
-	# mm = mask(d_info.wx, d_info.wy)
-	# smou = smouth(d_info.wx, d_info.wy)
-	rdisp: np.ndarray | None = None
-	destr_info: DestretchParams | None = None
-	for kernel1 in kernel_sizes:
-		kernel = np.zeros((kernel1, kernel1))
-
-		destr_info, rdisp = destr_control_points(ref, kernel, border_offset, spacing_ratio, mf)
-		destr_info_d[kernel1] = destr_info
-		rdisp_d[kernel1] = rdisp
-
-		mm = apod_mask(destr_info.kx, destr_info.ky, destr_info.mf)
-		mm_d[kernel1] = mm
-
-		smou = smouth(destr_info.kx, destr_info.ky)
-		smou_d[kernel1] = smou
-
-		win = doref(ref, mm, destr_info)
-		# win = doref(ref, mm, destr_info, use_fft)
-		windows[kernel1] = win
-	assert rdisp is not None
-		
-	disp_l = list(rdisp.shape)
-	disp_l.append(num_scenes)
-	disp_t = tuple(disp_l)
-	disp_all = np.zeros(disp_t)
-
-	disp: np.ndarray | None = None
-	for t in range(num_scenes):
-		for k in kernel_sizes:
-			(
-				scene_d[:, :, t], disp, rdisp, destr_info
-			) = reg_saved_window(
-				scene[:, :, t], 
-				windows[k], 
-				k, 
-				destr_info_d[k], 
-				rdisp_d[k], 
-				mm_d[k], 
-				smou_d[k], 
-				use_fft, 
-				adf2_pad
-			)
-		disp_all[:, :, :, t] = disp
-
-	end = time.time()
-	print(f"Total elapsed time {(end - start):.4f} seconds.")
-	ans = scene_d
-
-	return ans, disp_all, rdisp, destr_info
-
 def doreg(scene, r, d, destr_info) -> np.ndarray:
 	"""
 	Parameters
@@ -894,8 +761,8 @@ def reg(
 	x = doreg(scene, rdisp, disp, destr_info)
 	ans = x
 
-#    print(f"Total destr took: {(end - start):.5f} seconds for kernel"
- #         +f"of size {kernel_size} px.")
+	# print(f"Total destr took: {(end - start):.5f} seconds for kernel"
+ 	# 	+f"of size {kernel_size} px.")
 
 	return ans, disp, rdisp, destr_info
 
