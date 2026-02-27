@@ -527,6 +527,7 @@ def controlpoint_offsets_fft(
 	kernel_width, kernel_height = destr_info.kx, destr_info.ky
 
 	# flatten reference control point coordinates into 1d
+	assert destr_info.rcps is not None
 	control_points_x: np.ndarray = destr_info.rcps[0].ravel()
 	control_points_y: np.ndarray = destr_info.rcps[1].ravel()
 
@@ -640,7 +641,7 @@ def reg_loop(
 	return DestretchLoopResult(ans, displacement_sum, rdisp_sum, destr_info)
 
 def reg(
-	scene: np.ndarray, ref: np.ndarray, kernel_size: list[int], 
+	scene: np.ndarray, ref: np.ndarray, kernel_size: int, 
 	mf: float = 0.08, border_offset: int = 4, spacing_ratio: float = 0.5
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, DestretchParams]:
 	"""
@@ -742,6 +743,7 @@ def doref(
 	subfields_fftconj: Array (kernel_width, kernel_height, cp_x, cp_y)
 		Reorganized window
 	"""
+	assert destr_info.rcps is not None
 	k_width, k_height = destr_info.kx, destr_info.ky
 	cp_x, cp_y = destr_info.cpx, destr_info.cpy
 	ref_cps: np.ndarray = destr_info.rcps
