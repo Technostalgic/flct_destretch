@@ -3,7 +3,7 @@ Primary algorithm module to perform flct destretching image processing based
 on implementation by Momchil Molnar
 """
 
-## Imports and Initialization -------------------------------------------------|
+## Imports and Initialization --------------------------------------------------
 
 import time
 import numpy as np
@@ -14,7 +14,7 @@ from scipy.interpolate import RectBivariateSpline
 # internal
 from destretch_types import DestretchParams, DestretchLoopResult
 
-## Processing: ----------------------------------------------------------------|
+## Processing: -----------------------------------------------------------------
 
 def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor=False) -> np.ndarray:
 	"""
@@ -262,7 +262,7 @@ def surface_fit_vectorized(subwindows: np.ndarray, order: int = 0) -> np.ndarray
 	
 	return subwindows
 
-## Control Points -------------------------------------------------------------|
+## Destretching ----------------------------------------------------------------
 
 def bilin_control_points(scene, rdisp, disp):
 	"""
@@ -587,8 +587,6 @@ def controlpoint_offsets_fft(
 
 	return offsets
 
-## Regularization -------------------------------------------------------------|
-
 def reg_loop(
 		scene, ref, kernel_sizes, 
 		mf=0.08, use_fft=True, adf2_pad=0.25, adf_pow=2, border_offset=4, 
@@ -764,9 +762,6 @@ def reg(
  	# 	+f"of size {kernel_size} px.")
 
 	return ans, disp, rdisp, destr_info
-
-
-## Window ---------------------------------------------------------------------|
 
 def doref(
 	ref_image: np.ndarray, 
