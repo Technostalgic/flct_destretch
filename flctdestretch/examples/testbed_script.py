@@ -28,7 +28,7 @@ files = files[0:10]
 print(f"{len(files)} files found")
 
 # variables for destretching config
-kernel_sizes: np.ndarray[np.int64] = np.array([128, 64])
+kernel_sizes: np.ndarray[np.int64] = np.array([128, 64, 32, 16])
 rolling_mean_window_size: int = 3
 flowmap_window_size: int = 2
 
@@ -116,7 +116,7 @@ out_file_off_vid = os.path.join(files_dir, "video_offmap.mp4")
 out_file_off_final_vid = os.path.join(files_dir, "video_offmap_final.mp4")
 
 # output results as video files
-scale = 16
+scale = 4
 fits_to_mp4(get_fits_paths(out_flow_dir), out_file_flow_vid, 60, "copper", IndexSchema.TYX, 0.2, 1.25, True, scale_factor=scale)
 fits_to_mp4(get_fits_paths(out_dir), out_file_destr_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25)
 fits_to_mp4(files, out_file_orig_vid, 60, "copper", IndexSchema.XY, 0.2, 1.25)
