@@ -203,6 +203,69 @@ def crosscor_maxpos(cc, max_fit_method=1):
 
 	return ymax, xmax
 
+def correlation_maxpos_vectorized(
+		correlations: np.ndarray, 
+		max_fit_method: int = 1
+	) -> tuple[np.ndarray, np.ndarray]:
+	"""
+	Find coordinate of the peak for each correlation, with subpixel interpolation
+	"""
+
+	kernel_width = correlations.shape[1]
+	correlation_count = correlations.shape[0]
+	flat_correlations = correlations.reshape(correlation_count, -1)
+	peak_value = np.amax(flat_correlations, axis=1)
+	max_indices = np.argmax(flat_correlations, axis=1)
+	ymax_coord = max_indices % kernel_width
+	xmax_coord = max_indices // kernel_width
+	indices = np.arange(correlation_count)
+
+	match max_fit_method:
+
+		# simple interpolation
+		case 1:
+			xdenominators = (
+				peak_value * 2 - 
+				correlations[indices, xmax_coord-1, ymax_coord] - 
+				correlations[indices, xmax_coord+1, ymax_coord]
+			)
+			xratios = (
+				(xmax_coord - 0.5) + 
+				(peak_value - correlations[indices, xmax_coord-1, ymax_coord]) / 
+				xdenominators
+			)
+
+			ydenominators = (
+				peak_value * 2 - 
+				correlations[indices, xmax_coord, ymax_coord-1] - 
+				correlations[indices, xmax_coord, ymax_coord+1]
+			)
+			yratios = (
+				(ymax_coord - 0.5) + 
+				(peak_value - correlations[indices, xmax_coord, ymax_coord-1]) / 
+				ydenominators
+			)
+			return xratios, yratios
+		
+		# a more complicated interpolation
+		# (from Niblack, W: An Introduction to Digital Image Processing, p 139.)
+		case 2:
+			# TODO vectorize:
+			# a2 = (cc[xmax+1, ymax] - cc[xmax-1, ymax])/2.
+			# a3 = (cc[xmax+1, ymax]/2. - cc[xmax, ymax] + cc[xmax-1, ymax]/2.)
+			# a4 = (cc[xmax, ymax+1] - cc[xmax, ymax-1])/2.
+			# a5 = (cc[xmax, ymax+1]/2. - cc[xmax, ymax] + cc[xmax, ymax-1]/2.)
+			# a6 = (cc[xmax+1, ymax+1] - cc[xmax+1, ymax-1] 
+			# 	- cc[xmax-1, ymax+1] + cc[xmax-1, ymax-1])/4.
+			# xdif = (2*a2*a5 - a4*a6) / (a6**2 - 4*a3*a5)
+			# ydif = (2*a3*a4 - a2*a6) / (a6**2 - 4*a3*a5)
+			# xmax = xmax + xdif
+			# ymax = ymax + ydif
+			raise NotImplementedError
+		
+		case _:
+			raise NotImplementedError
+
 def surface_fit(points_array, order=0):
 	"""
 	Fit a polynomial surface to a 2-D array of values.
@@ -533,47 +596,71 @@ def controlpoint_offsets_fft(
 
 	"""
 
-	# stores the offsets calculated for each subwindow against reference
-	# should be (y, x) instead?
-	offsets = np.zeros((2, destr_info.cpx, destr_info.cpy), order="F") 
+	kernel_width, kernel_height = destr_info.kx, destr_info.ky
+
+	# flatten reference control point coordinates into 1d
+	control_points_x: np.ndarray = destr_info.rcps[0].ravel()
+	control_points_y: np.ndarray = destr_info.rcps[1].ravel()
+
+	# find top left (subwindow start coordinate) of each subwindow for each control point
+	topleft_x = (control_points_x - kernel_width // 2).astype(int)
+	topleft_y = (control_points_y - kernel_height // 2).astype(int)
+
+	# create an array to hold each subwindow
+	xgrid = np.arange(kernel_width).reshape((kernel_width, 1))
+	ygrid = np.arange(kernel_height).reshape((1, kernel_height))
+	subwindows = scene[
+		topleft_x[:, np.newaxis, np.newaxis] + xgrid[np.newaxis, :, :],
+		topleft_y[:, np.newaxis, np.newaxis] + ygrid[np.newaxis, :, :]
+	].copy()
+	subwindow_count: int = subwindows.shape[0]
+
+	# apply surface fit
+	# TODO implement order 1
+	destr_info.subfield_correction = 0
+	match(destr_info.subfield_correction):
+		
+		# order 0 - flat mean fit
+		case 0:
+			subwindows -= subwindows.mean(axis=(1, 2), keepdims=True)
+
+		# order 1 - plane surface fit
+		case 1:
+			# TODO
+			pass
+
+		# higher orders are not feasible to vectorize
+		case _: raise NotImplementedError()
 	
-	# iterate through each control point
-	for j in range(0, destr_info.cpy):
-		for i in range(0, destr_info.cpx):
+	# apply apodization mask
+	subwindows *= apod_window[np.newaxis, :, :]
 
-			# determine edges of subwindow
-			start_x = int(destr_info.rcps[0, i, j] - destr_info.kx / 2)
-			end_x = int(start_x + destr_info.kx - 1)
-			start_y = int(destr_info.rcps[1, i, j] - destr_info.ky / 2)
-			end_y = int(start_y + destr_info.ky - 1)
+	# reshape reference image fft conjugates to match subwindows arrary
+	ref_fft = (
+		subfield_fftconj
+			.reshape(kernel_width, kernel_height, subwindow_count)
+			.transpose(2,0,1)
+	)
 
-			# create scene subwindow
-			subscene = scene[
-				start_x : end_x + 1,
-				start_y : end_y + 1
-			].copy()
-			subscene -= surface_fit(subscene, destr_info.subfield_correction)
-			
-			# apply fft and multiply by reference conjugate
-			subscene_fft = np.array(np.fft.fft2(subscene * apod_window), order="F")
-			subscene_fft *= subfield_fftconj[:, :, i, j] * lowpass_filter
+	# apply fft to subwindows
+	# TODO parallelize with scipi?
+	ffts = np.fft.fft2(subwindows, axes=(1, 2)) 
+	ffts *= ref_fft
+	ffts *- lowpass_filter[np.newaxis, :, :]
 
-			# get correlation from reversing fft
-			subscene_ifft = np.abs(np.fft.ifft2(subscene_fft), order="F")
-			correlation = np.roll(
-				subscene_ifft, 
-				# should this be (y, x) instead?
-				(destr_info.kx / 2, destr_info.ky / 2), 
-				axis=(0, 1)
-			)
-			correlation = np.array(correlation, order="F")
+	# find cross correlation from inverse fft
+	# TODO parallelize with scipi?
+	correlations = np.abs(np.fft.ifft2(ffts, axes=(1,2)))
+	correlations = np.roll(correlations, (kernel_width // 2, kernel_height // 2), axis=(1, 2))
 
-			# store the max correlation position
-			# should the offsets be indexed from y initially, and then x?
-			ymax, xmax = crosscor_maxpos(correlation, destr_info.max_fit_method)
-			offsets[0, i, j] = start_x + xmax
-			offsets[1, i, j] = start_y + ymax
-	
+	# find peak for each correlation, with subpixel interpolation
+	xmax, ymax = correlation_maxpos_vectorized(correlations, destr_info.max_fit_method)
+
+	# store peak coordinates
+	offsets = np.zeros((2, destr_info.cpx, destr_info.cpy), dtype=np.float32)
+	offsets[0].ravel()[:] = topleft_x + xmax
+	offsets[1].ravel()[:] = topleft_y + ymax
+
 	return offsets
 
 def controlpoint_offsets_adf(
@@ -847,7 +934,7 @@ def doreg(scene, r, d, destr_info) -> np.ndarray:
 
 def reg(
 		scene, ref, kernel_size, mf=0.08, 
-		use_fft=False, adf_pad=0.25, adf_pow=2, 
+		use_fft=True, adf_pad=0.25, adf_pow=2, 
 		border_offset=4, spacing_ratio=0.5
 	) -> tuple[np.ndarray, np.ndarray, np.ndarray, DestretchParams]:
 	# TODO: clean up control point offset calculations - move FFT specific 
