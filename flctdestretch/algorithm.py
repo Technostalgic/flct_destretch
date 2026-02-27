@@ -7,8 +7,7 @@ on implementation by Momchil Molnar
 
 import time
 import numpy as np
-import numpy.typing as npt
-from scipy import signal as signal
+from scipy import fft
 from scipy.signal.windows import blackman
 from scipy.interpolate import RectBivariateSpline
 
@@ -569,13 +568,13 @@ def controlpoint_offsets_fft(
 
 	# apply fft to subwindows
 	# TODO parallelize with scipi?
-	ffts = np.fft.fft2(subwindows, axes=(1, 2)) 
+	ffts = fft.fft2(subwindows, axes=(1, 2), workers=-1) 
 	ffts *= ref_fft
 	ffts *= lowpass_filter[np.newaxis, :, :]
 
 	# find cross correlation from inverse fft
 	# TODO parallelize with scipi?
-	correlations = np.abs(np.fft.ifft2(ffts, axes=(1,2)))
+	correlations = np.abs(fft.ifft2(ffts, axes=(1,2), workers=-1))
 	correlations = np.roll(correlations, (kernel_width // 2, kernel_height // 2), axis=(1, 2))
 
 	# find peak for each correlation, with subpixel interpolation
@@ -748,7 +747,7 @@ def reg(
 	subfield_fftconj = doref(ref, apod_window, destr_info)
 	disp = controlpoint_offsets_fft(scene, subfield_fftconj, apod_window, smou, destr_info)
 	
-	if do_timing: 
+	if do_timing:
 		dtime = time.time() - start
 		print(f"Time for a scene destretch is {dtime:.3f}")
 
@@ -813,7 +812,7 @@ def doref(
 	# calculate and store the fft conjugate for each subwindow
 	subfields_fftconj = (
 		np.array(
-			np.conj(np.fft.fft2(subwindows, axes=(1,2))),
+			np.conj(fft.fft2(subwindows, axes=(1,2), workers=-1)),
 			order="F"
 		)
 		.reshape(cp_x, cp_y, k_width, k_height)
