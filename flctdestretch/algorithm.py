@@ -688,7 +688,7 @@ def reg(
 		apod_window, smou, destr_info
 	)
 	
-	filter_weights = ccfilter.psr_filter_weights(correlations)
+	# filter_weights = ccfilter.psr_filter_weights(correlations)
 	# TODO apply these filter weights to offsets somehow
 
 	ans = doreg(scene, rdisp, disp)
