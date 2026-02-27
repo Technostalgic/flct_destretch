@@ -18,8 +18,7 @@ from destretch_types import DestretchParams, DestretchLoopResult
 
 def bilin_values_scene(scene, coords_new, nearest_neighbor=False) -> np.ndarray:
 	"""
-	Bilinear interpolation (resampling)
-	of the scene s at coordinates xy
+	Bilinear interpolation (resampling) of the scene s at coordinates xy
 
 	Parameters
 	----------
@@ -33,7 +32,6 @@ def bilin_values_scene(scene, coords_new, nearest_neighbor=False) -> np.ndarray:
 	-------
 	ans: ndarray (nx, ny)
 		Bilinear interpolated (resampled) image at the xy locations
-
 	"""
 
 	if nearest_neighbor == True:
@@ -41,8 +39,10 @@ def bilin_values_scene(scene, coords_new, nearest_neighbor=False) -> np.ndarray:
 		y = np.array(np.round(coords_new[1, :, :]), order="F", dtype=int)
 		
 		print(scene.shape,x.shape,y.shape)
-		scene_interp = scene[np.clip(x,0,x.shape[0]-1), 
-							 np.clip(y,0,y.shape[1]-1)]
+		scene_interp = scene[
+			np.clip(x,0,x.shape[0]-1), 
+			np.clip(y,0,y.shape[1]-1)
+		]
 
 	else:
 		x = np.array(coords_new[0, :, :], order="F")
@@ -497,7 +497,7 @@ def controlpoint_offsets_fft(
 	apod_window: np.ndarray, 
 	lowpass_filter: np.ndarray, 
 	destr_info: DestretchParams
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
 	"""
 	Calculate the offsets of the control points in the reference frame, which 
 	can be determined from the subfield fft cojugates passed in here
@@ -517,8 +517,11 @@ def controlpoint_offsets_fft(
 
 	Returns
 	-------
-	subfield_offsets : array
-		X and Y offsets for control points
+	offsets : 2D Vector Array
+		x and y offsets for control points
+	correlations : 2D Scalar Array
+		the correlation maps for each subwindow from the product of scene fft 
+		and reference fft conjugate
 	"""
 
 	kernel_width, kernel_height = destr_info.kx, destr_info.ky
@@ -572,7 +575,7 @@ def controlpoint_offsets_fft(
 	offsets[0].ravel()[:] = topleft_x + xmax
 	offsets[1].ravel()[:] = topleft_y + ymax
 
-	return offsets
+	return offsets, correlations
 
 def reg_loop(
 	scene: np.ndarray, ref: np.ndarray, kernel_sizes: list[int], 
@@ -608,7 +611,7 @@ def reg_loop(
 
 	destr_info: DestretchParams | None = None
 	for kernel_dim in kernel_sizes:
-		scene_temp, disp, rdisp, destr_info = reg(
+		scene_temp, disp, rdisp, correlations, destr_info = reg(
 			scene_temp, ref, kernel_dim, 
 			mf, border_offset, spacing_ratio
 		)
@@ -641,11 +644,7 @@ def reg_loop(
 def reg(
 	scene: np.ndarray, ref: np.ndarray, kernel_size: list[int], 
 	mf: float = 0.08, border_offset: int = 4, spacing_ratio: float = 0.5
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, DestretchParams]:
-	
-	# TODO: clean up control point offset calculations - move FFT specific 
-	# calls (e.g. apod) into conditional
-	# TODO: testing framework - pytest?
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, DestretchParams]:
 	"""
 	Register scenes with respect to ref using kernel size and
 	then returns the destretched scene.
@@ -667,9 +666,12 @@ def reg(
 		Control point locations
 	rdisp : ndarray (kx, ky)
 		Reference control point locations
-
+	correlations : ndarray (n, ksize, ksize)
+		The correlation maps calculated for each subwindow against their reference image
 	"""
-	do_timing = False
+	# TODO: clean up control point offset calculations - move FFT specific 
+	# calls (e.g. apod) into conditional
+	# TODO: testing framework - pytest?
 
 	scene -= scene.mean()
 	ref -= ref.mean()
@@ -681,22 +683,17 @@ def reg(
 	apod_window = apod_mask(destr_info.kx, destr_info.ky, destr_info.mf)
 	smou = smouth(destr_info.kx, destr_info.ky)
 
-	ssz = scene.shape
-	ans = np.zeros((ssz[0], ssz[1]), order="F")
-
-	start = time.time()
-
 	subfield_fftconj = doref(ref, apod_window, destr_info)
-	disp = controlpoint_offsets_fft(scene, subfield_fftconj, apod_window, smou, destr_info)
+	disp, correlations = controlpoint_offsets_fft(
+		scene, subfield_fftconj, 
+		apod_window, smou, destr_info
+	)
 	
-	if do_timing:
-		dtime = time.time() - start
-		print(f"Time for a scene destretch is {dtime:.3f}")
+	# TODO filter correlations here
 
-	x = doreg(scene, rdisp, disp)
-	ans = x
+	ans = doreg(scene, rdisp, disp)
 
-	return ans, disp, rdisp, destr_info
+	return ans, disp, rdisp, correlations, destr_info
 
 def doreg(
 	scene: np.ndarray, 
