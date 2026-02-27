@@ -541,8 +541,7 @@ def controlpoint_offsets_fft(
 	subwindow_count: int = subwindows.shape[0]
 
 	# apply surface fit
-	# TODO implement order 1
-	subwindows = surface_fit_vectorized(subwindows, 0)
+	subwindows = surface_fit_vectorized(subwindows, destr_info.subfield_correction)
 
 	# apply apodization mask
 	subwindows *= apod_window[np.newaxis, :, :]
@@ -773,8 +772,7 @@ def doref(
 	].copy()
 
 	# apply suface fit and then apod mask
-	# TODO implement order 1
-	subwindows = surface_fit_vectorized(subwindows, 0)
+	subwindows = surface_fit_vectorized(subwindows, destr_info.subfield_correction)
 	subwindows *= apod_mask[np.newaxis, :, :]
 	
 	# calculate and store the fft conjugate for each subwindow
