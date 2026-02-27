@@ -16,7 +16,7 @@ from destretch_types import DestretchParams, DestretchLoopResult
 
 ## Processing: -----------------------------------------------------------------
 
-def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor=False) -> np.ndarray:
+def bilin_values_scene(scene, coords_new, nearest_neighbor=False) -> np.ndarray:
 	"""
 	Bilinear interpolation (resampling)
 	of the scene s at coordinates xy
@@ -28,8 +28,6 @@ def bilin_values_scene(scene, coords_new, destr_info, nearest_neighbor=False) ->
 	coords_new : ndarray (2, nx, ny)
 		coordinates of the pixels of the output image
 		on the input image (at which to interpolate the scene)
-	destr_info: class Destretch_Params
-		Destretch parameters
 
 	Returns
 	-------
@@ -264,7 +262,11 @@ def surface_fit_vectorized(subwindows: np.ndarray, order: int = 0) -> np.ndarray
 
 ## Destretching ----------------------------------------------------------------
 
-def bilin_control_points(scene, rdisp, disp):
+def bilin_control_points(
+	scene: np.ndarray, 
+	rdisp: np.ndarray, 
+	disp: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
 	"""
 	Compute the coordinates of the pixels in the output images to be
 	sampled from the input image (using Scipy.interpolate.RectBivariate).
@@ -316,16 +318,11 @@ def bilin_control_points(scene, rdisp, disp):
 		for el in range(scene_nx)
 	]
 
-	# flip the axes
-	# xy_ref_coordinates = np.swapaxes(xy_ref_coordinates, 1, 2)
-
 	# calculate offsets between displaced and reference positions
 	dd = disp - rdisp
 
 	interp_x = RectBivariateSpline(cp_x_coords, cp_y_coords, dd[0, :, :], kx=3, ky=3, s=0)
 	interp_y = RectBivariateSpline(cp_x_coords, cp_y_coords, dd[1, :, :], kx=3, ky=3, s=0)
-	#interp_x = SmoothBivariateSpline((rdisp[0, :, :]).flatten(), (rdisp[1, :, :]).flatten(), (dd[0, :, :]).flatten())
-	#interp_y = SmoothBivariateSpline((rdisp[0, :, :]).flatten(), (rdisp[1, :, :]).flatten(), (dd[1, :, :]).flatten())
 
 	xy_grid = np.zeros((2, scene_nx, scene_ny))
 
@@ -340,15 +337,6 @@ def bilin_control_points(scene, rdisp, disp):
 		x_coords_output, y_coords_output,
 		grid=True
 	)
-
-	# if test == True:
-	#    im1 = pl.imshow(xy_grid[0, :, :])
-	#    pl.colorbar(im1)
-	#    pl.show()
-	#
-	#    im2 = pl.imshow(xy_grid[1, :, :])
-	#    pl.colorbar(im2)
-	#    pl.show()
 
 	xy_grid_coords = xy_grid + xy_ref_coordinates
 
@@ -588,10 +576,10 @@ def controlpoint_offsets_fft(
 	return offsets
 
 def reg_loop(
-		scene, ref, kernel_sizes, 
-		mf=0.08, use_fft=True, adf2_pad=0.25, adf_pow=2, border_offset=4, 
-		spacing_ratio=0.5
-	) -> DestretchLoopResult:
+	scene: np.ndarray, ref: np.ndarray, kernel_sizes: list[int], 
+	mf: float = 0.08, border_offset: int = 4, 
+	spacing_ratio: float = 0.5
+) -> DestretchLoopResult:
 	"""
 	Parameters
 	----------
@@ -610,28 +598,28 @@ def reg_loop(
 		Parameters of the destretching
 	"""
 
-	scene_nx = scene.shape[0]
-	scene_ny = scene.shape[1]
+	scene_nx: int = scene.shape[0]
+	scene_ny: int = scene.shape[1]
 
 	scene_temp = scene.copy()
-	# start = time.time()
-	# print("Spacing Ratio: ", spacing_ratio)
-
-	disp_sum     = np.zeros((2, scene_nx, scene_ny))
-	offsets_sum  = np.zeros((2, scene_nx, scene_ny))
-	rdisp_sum    = np.zeros((2, scene_nx, scene_ny))
-	kernel_count = 0.0
+	displacement_sum = np.zeros((2, scene_nx, scene_ny))
+	offsets_sum = np.zeros((2, scene_nx, scene_ny))
+	rdisp_sum = np.zeros((2, scene_nx, scene_ny))
+	kernel_count = 0
 
 	destr_info: DestretchParams | None = None
 	for kernel_dim in kernel_sizes:
-		scene_temp, disp, rdisp, destr_info = reg(scene_temp, ref, kernel_dim, mf, use_fft, adf2_pad, adf_pow, border_offset, spacing_ratio)
+		scene_temp, disp, rdisp, destr_info = reg(
+			scene_temp, ref, kernel_dim, 
+			mf, border_offset, spacing_ratio
+		)
 		# remap displacements onto spatial grid of scene 
 		# (i.e. the same number of pixels as the input image)
 		dispmap_new, offsets_new  = bilin_control_points(scene, rdisp, disp)
 		# add the displacement and offset maps to
-		disp_sum     += dispmap_new
-		offsets_sum  += offsets_new
-		rdisp_sum    += dispmap_new - offsets_new
+		displacement_sum += dispmap_new
+		offsets_sum += offsets_new
+		rdisp_sum += dispmap_new - offsets_new
 		kernel_count += 1
 	assert destr_info is not None
 
@@ -642,60 +630,50 @@ def reg_loop(
 	# the displacement maps contain the pixel reference coordinates, so 
 	# adding them iteratively sums those reference coordinates
 	# divide by the number of maps summed to get back to the rate coordinates
-	disp_sum /= kernel_count
+	displacement_sum /= kernel_count
 	rdisp_sum /= kernel_count
 
 	# end = time.time()
 	# print(f"Total elapsed time {(end - start):.4f} seconds.")
 	ans = scene_temp
 
-	return DestretchLoopResult(ans, disp_sum, rdisp_sum, destr_info)
+	return DestretchLoopResult(ans, displacement_sum, rdisp_sum, destr_info)
 
-def doreg(scene, r, d, destr_info) -> np.ndarray:
+def doreg(
+	scene: np.ndarray, 
+	ref_disp: np.ndarray, 
+	disp: np.ndarray, 
+) -> np.ndarray:
 	"""
 	Parameters
 	----------
-	scene : TYPE
+	scene : 2D Scalar Array
 		Scene to be destretched
-	r : TYPE
+	ref_disp : 2D Vector Array
 		reference displacements of the control points
-	d : TYPE
+	disp : 2D Vector Array
 		Actual displacements of the control points
-	destr_info: Destr class
+	destr_info: DestretchParams
 		Destretch information
 
 	Returns
 	-------
-	ans : TYPE
+	ans : Array
 		Destretched scene.
-
 	"""
 
-	xy, xy_offsets  = bilin_control_points(scene, r, d)
-	# this was some old code for juggling the axes to match the inputs for bilin_values_scene
-	# sorted out the axes in the other procedures so this should no longer be necessary
-	#xy = xy[[1,0],:,:]
-	#xy = np.swapaxes(xy, 1, 2)
-	#scene = np.swapaxes(copy.deepcopy(scene), 0, 1)
-
-	ans = bilin_values_scene(scene, xy, destr_info, nearest_neighbor=False)
+	xy, _ = bilin_control_points(scene, ref_disp, disp)
+	ans = bilin_values_scene(scene, xy, nearest_neighbor=False)
 
 	return ans
 
 def reg(
-	scene, ref, kernel_size, mf=0.08, 
-	use_fft=True, adf_pad=0.25, adf_pow=2, 
-	border_offset=4, spacing_ratio=0.5
+	scene: np.ndarray, ref: np.ndarray, kernel_size: list[int], 
+	mf: float = 0.08, border_offset: int = 4, spacing_ratio: float = 0.5
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, DestretchParams]:
+	
 	# TODO: clean up control point offset calculations - move FFT specific 
 	# calls (e.g. apod) into conditional
-	# TODO: (here and elsewhere) rename d_info to destr_info
-	# TODO: add crosscorrelation choice, other parameters to destr_info; 
-	# rename destr_info.mf
-	# TODO: make destr_info an optional input
-	# TODO: change spacing_ratio to controlpoint_spacing (in pixels)
-	# TODO: add documentation to functions, etc.!
-	# TODO: process flowchart
 	# TODO: testing framework - pytest?
 	"""
 	Register scenes with respect to ref using kernel size and
@@ -712,7 +690,7 @@ def reg(
 
 	Returns
 	-------
-	ans : [nx, ny]
+	ans : Array [nx, ny]
 		Destreched scene.
 	disp : ndarray (kx, ky)
 		Control point locations
@@ -728,14 +706,9 @@ def reg(
 
 	# compute control point locations
 	destr_info, rdisp = destr_control_points(ref, kernel, border_offset, spacing_ratio, mf)
-	#destr_info.subfield_correction = 0
-	destr_info.subfield_correction = 1
-	
-	destr_info.use_fft = use_fft
 	
 	apod_window = apod_mask(destr_info.kx, destr_info.ky, destr_info.mf)
 	smou = smouth(destr_info.kx, destr_info.ky)
-	#Condition the ref
 
 	ssz = scene.shape
 	ans = np.zeros((ssz[0], ssz[1]), order="F")
@@ -755,7 +728,7 @@ def reg(
 	#mdisp = np.mean(rdisp-disp,axis=(1, 2))
 	#disp[0, :, :] += mdisp[0]
 	#disp[1, :, :] += mdisp[1]
-	x = doreg(scene, rdisp, disp, destr_info)
+	x = doreg(scene, rdisp, disp)
 	ans = x
 
 	# print(f"Total destr took: {(end - start):.5f} seconds for kernel"
@@ -773,16 +746,16 @@ def doref(
 
 	Parameters
 	----------
-	ref : a 2-dimensional array (L x M) containing the reference image
-			against which the scene should be registered
-	apod_mask : apodization mask to be applied to subfield image 
-		mask
-	destr_info : TYPE
-		Destretch_info.
+	ref_image : 2D Scalar Array
+		reference image against which the scene should be registered
+	apod_mask : 2D Scalar Array
+		apodization mask to be applied to subfield image
+	destr_info : DestretchParams
+		Destretch_info
 
 	Returns
 	-------
-	subfields_fftconj: array (kx, ky, cp_numx, cp_numy)
+	subfields_fftconj: Array (kernel_width, kernel_height, cp_x, cp_y)
 		Reorganized window
 	"""
 	k_width, k_height = destr_info.kx, destr_info.ky

@@ -66,8 +66,6 @@ class DestretchParams():
 		
 	# TODO describe these fields
 	max_fit_method: int = 1
-	use_fft: bool = True
-	do_plots: bool = False
 	debug: bool = False
 
 	def print_props(self):
