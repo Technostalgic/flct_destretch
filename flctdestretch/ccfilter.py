@@ -10,8 +10,8 @@ import numpy as np
 
 def get_psrs(
 	correlations: np.ndarray, 
-	mask_radius: float = None, 
-	peak_coords: np.ndarray = None
+	mask_radius: float | None = None, 
+	peak_coords: np.ndarray | None = None
 ) -> np.ndarray:
 	"""
 	calculate peak-to-sidelobe ratio for a set of correlations
