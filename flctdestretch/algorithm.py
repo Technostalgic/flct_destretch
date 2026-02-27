@@ -3,18 +3,17 @@ Primary algorithm module to perform flct destretching image processing based
 on implementation by Momchil Molnar
 """
 
-
 ## Imports and Initialization -------------------------------------------------|
 
 import time
 import numpy as np
+import numpy.typing as npt
 from scipy import signal as signal
 from scipy.signal.windows import blackman
 from scipy.interpolate import RectBivariateSpline
 
 # internal
 from destretch_types import DestretchParams, DestretchLoopResult
-
 
 ## Processing: ----------------------------------------------------------------|
 
@@ -166,18 +165,18 @@ def smouth(nx, ny):
 	return mm
 
 def correlation_maxpos_vectorized(
-		correlations: np.ndarray, 
-		max_fit_method: int = 1
-	) -> tuple[np.ndarray, np.ndarray]:
+	correlations: np.ndarray, 
+	max_fit_method: int = 1
+) -> tuple[np.ndarray, np.ndarray]:
 	"""
 	Find coordinate of the peak for each correlation, with subpixel interpolation
 	"""
 
-	kernel_width = correlations.shape[1]
-	correlation_count = correlations.shape[0]
+	kernel_width, kernel_height = correlations.shape[1:]
+	correlation_count: int = correlations.shape[0]
 	flat_correlations = correlations.reshape(correlation_count, -1)
 	peak_value = np.amax(flat_correlations, axis=1)
-	max_indices = np.argmax(flat_correlations, axis=1)
+	max_indices: np.ndarray = np.argmax(flat_correlations, axis=1)
 	ymax_coord = max_indices % kernel_width
 	xmax_coord = max_indices // kernel_width
 	indices = np.arange(correlation_count)
@@ -188,8 +187,8 @@ def correlation_maxpos_vectorized(
 		case 1:
 			xdenominators = (
 				peak_value * 2 - 
-				correlations[indices, xmax_coord-1, ymax_coord] - 
-				correlations[indices, xmax_coord+1, ymax_coord]
+				correlations[indices, np.clip(xmax_coord - 1, 0, kernel_width - 1), ymax_coord] - 
+				correlations[indices, np.clip(xmax_coord + 1, 0, kernel_width - 1), ymax_coord]
 			)
 			xratios = (
 				(xmax_coord - 0.5) + 
@@ -199,8 +198,8 @@ def correlation_maxpos_vectorized(
 
 			ydenominators = (
 				peak_value * 2 - 
-				correlations[indices, xmax_coord, ymax_coord-1] - 
-				correlations[indices, xmax_coord, ymax_coord+1]
+				correlations[indices, xmax_coord, np.clip(ymax_coord - 1, 0, kernel_height - 1)] - 
+				correlations[indices, xmax_coord, np.clip(ymax_coord + 1, 0, kernel_height - 1)]
 			)
 			yratios = (
 				(ymax_coord - 0.5) + 
@@ -286,6 +285,28 @@ def surface_fit(points_array, order=0):
 		
 		return surface_array
 
+def surface_fit_vectorized(subwindows: np.ndarray, order: int = 0) -> np.ndarray:
+	"""
+	fit a polynomial surface against each subwindow in an array of 2D arrays
+
+	WARNING: fit happens in-place, so parameters are modified
+	"""
+	# TODO implement order 1
+	match(order):
+		
+		# order 0 - flat mean fit
+		case 0:
+			subwindows -= subwindows.mean(axis=(1, 2), keepdims=True)
+
+		# order 1 - plane surface fit
+		case 1:
+			# TODO
+			raise NotImplementedError()
+
+		# higher orders are not feasible to vectorize
+		case _: raise NotImplementedError()
+	
+	return subwindows
 
 ## Control Points -------------------------------------------------------------|
 
@@ -529,12 +550,12 @@ def destr_control_points(
 	return destr_info, rcps
 
 def controlpoint_offsets_fft(
-		scene: np.ndarray, 
-		subfield_fftconj: np.ndarray, 
-		apod_window: np.ndarray, 
-		lowpass_filter: np.ndarray, 
-		destr_info: DestretchParams
-	) -> np.ndarray:
+	scene: np.ndarray, 
+	subfield_fftconj: np.ndarray, 
+	apod_window: np.ndarray, 
+	lowpass_filter: np.ndarray, 
+	destr_info: DestretchParams
+) -> np.ndarray:
 	"""
 	Locate control points
 
@@ -579,21 +600,8 @@ def controlpoint_offsets_fft(
 
 	# apply surface fit
 	# TODO implement order 1
-	destr_info.subfield_correction = 0
-	match(destr_info.subfield_correction):
-		
-		# order 0 - flat mean fit
-		case 0:
-			subwindows -= subwindows.mean(axis=(1, 2), keepdims=True)
+	subwindows = surface_fit_vectorized(subwindows, 0)
 
-		# order 1 - plane surface fit
-		case 1:
-			# TODO
-			pass
-
-		# higher orders are not feasible to vectorize
-		case _: raise NotImplementedError()
-	
 	# apply apodization mask
 	subwindows *= apod_window[np.newaxis, :, :]
 
@@ -608,7 +616,7 @@ def controlpoint_offsets_fft(
 	# TODO parallelize with scipi?
 	ffts = np.fft.fft2(subwindows, axes=(1, 2)) 
 	ffts *= ref_fft
-	ffts *- lowpass_filter[np.newaxis, :, :]
+	ffts *= lowpass_filter[np.newaxis, :, :]
 
 	# find cross correlation from inverse fft
 	# TODO parallelize with scipi?
@@ -811,10 +819,10 @@ def doreg(scene, r, d, destr_info) -> np.ndarray:
 	return ans
 
 def reg(
-		scene, ref, kernel_size, mf=0.08, 
-		use_fft=True, adf_pad=0.25, adf_pow=2, 
-		border_offset=4, spacing_ratio=0.5
-	) -> tuple[np.ndarray, np.ndarray, np.ndarray, DestretchParams]:
+	scene, ref, kernel_size, mf=0.08, 
+	use_fft=True, adf_pad=0.25, adf_pow=2, 
+	border_offset=4, spacing_ratio=0.5
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, DestretchParams]:
 	# TODO: clean up control point offset calculations - move FFT specific 
 	# calls (e.g. apod) into conditional
 	# TODO: (here and elsewhere) rename d_info to destr_info
@@ -870,7 +878,7 @@ def reg(
 
 	start = time.time()
 
-	subfield_fftconj, _ = doref(ref, apod_window, destr_info)
+	subfield_fftconj = doref(ref, apod_window, destr_info)
 	disp = controlpoint_offsets_fft(scene, subfield_fftconj, apod_window, smou, destr_info)
 	
 	if do_timing: 
@@ -894,7 +902,11 @@ def reg(
 
 ## Window ---------------------------------------------------------------------|
 
-def doref(ref_image, apod_mask, destr_info):
+def doref(
+	ref_image: np.ndarray, 
+	apod_mask: np.ndarray, 
+	destr_info: DestretchParams
+) -> np.ndarray:
 	"""
 	Setup reference window
 
@@ -912,55 +924,36 @@ def doref(ref_image, apod_mask, destr_info):
 	subfields_fftconj: array (kx, ky, cp_numx, cp_numy)
 		Reorganized window
 	"""
+	k_width, k_height = destr_info.kx, destr_info.ky
+	cp_x, cp_y = destr_info.cpx, destr_info.cpy
+	ref_cps: np.ndarray = destr_info.rcps
 
-	subfields_fftconj = np.zeros((destr_info.kx, destr_info.ky, destr_info.cpx, destr_info.cpy),
-				   dtype="complex", order="F")
+	# create an array to hold a subwindow for each kernel
+	topleft_x = (ref_cps[0].ravel() - k_width * 0.5).astype(int)
+	topleft_y = (ref_cps[1].ravel() - k_height * 0.5).astype(int)
+	xgrid = np.arange(k_width).reshape((k_width, 1))
+	ygrid = np.arange(k_height).reshape((1, k_height))
+	subwindows = ref_image[
+		topleft_x[:, np.newaxis, np.newaxis] + xgrid[np.newaxis, :, :],
+		topleft_y[:, np.newaxis, np.newaxis] + ygrid[np.newaxis, :, :]
+	].copy()
+
+	# apply suface fit and then apod mask
+	# TODO implement order 1
+	subwindows = surface_fit_vectorized(subwindows, 0)
+	subwindows *= apod_mask[np.newaxis, :, :]
 	
-	subfields_images = np.zeros((destr_info.kx, destr_info.ky, destr_info.cpx, destr_info.cpy),
-				   dtype="float32", order="F")
+	# calculate and store the fft conjugate for each subwindow
+	subfields_fftconj = (
+		np.array(
+			np.conj(np.fft.fft2(subwindows, axes=(1,2))),
+			order="F"
+		)
+		.reshape(cp_x, cp_y, k_width, k_height)
+		.transpose(2,3,0,1)
+	)
 
-	# number of elements in each subfield
-	nelz = destr_info.kx * destr_info.ky
-	
-	# from previous method for computing subfields - see comment below for better approach
-	#sub_strt_y = destr_info.by
-	#sub_end_y  = sub_strt_y + destr_info.wy - 1
-	
-	for j in range(0, destr_info.cpy):
-		#sub_strt_x = destr_info.bx
-		#sub_end_x  = sub_strt_x + destr_info.wx - 1
-
-		for i in range(0, destr_info.cpx):
-			# instead of incrementing the subarray positions with a fixed step
-			# size, we should instead take the reference positions 
-			# from the predefined control points and extract 
-			# the appropriate sized subarray around those coordinates
-			# This will be more flexible going forward, especially considering 
-			# the possibility of irregular sampling
-			# take the reference position and define the start of the box as 
-			# half the kernel size to the left (below), and then add the kernel size
-			# to get the right (top) boundary
-			sub_strt_x  = int(destr_info.rcps[0,i,j] - destr_info.kx/2)
-			sub_end_x   = int(sub_strt_x + destr_info.kx - 1)
-
-			sub_strt_y  = int(destr_info.rcps[1,i,j] - destr_info.ky/2)
-			sub_end_y   = int(sub_strt_y + destr_info.ky - 1)
-			
-			ref_subarr = ref_image[sub_strt_x:(sub_end_x+1), sub_strt_y:(sub_end_y+1)].copy()
-			
-			ref_subarr -= surface_fit(ref_subarr, destr_info.subfield_correction)
-			subfields_images[:, :, i, j] = ref_subarr
-				
-			 # store the complex conjugate of the FFT of each reference subfield 
-			 #    (for later calculation of the cross correlation with the target subfield)
-			subfields_fftconj[:, :, i, j] = np.array(np.conj(np.fft.fft2(ref_subarr * apod_mask)), order="F")
-
-			#sub_strt_y = sub_strt_y + destr_info.kx
-			#sub_end_y = sub_end_y + destr_info.kx
-		#sub_strt_y = sub_strt_y + destr_info.ky
-		#sub_end_y = sub_end_y + destr_info.ky
-
-	return subfields_fftconj, subfields_images
+	return subfields_fftconj
 
 def reg_saved_window(
 		scene, subfield_fftconj, kernel_size, destr_info, rdisp, 
