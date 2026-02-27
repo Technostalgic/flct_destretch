@@ -5,13 +5,13 @@ on implementation by Momchil Molnar
 
 ## Imports and Initialization --------------------------------------------------
 
-import time
 import numpy as np
 from scipy import fft
 from scipy.signal.windows import blackman
 from scipy.interpolate import RectBivariateSpline
 
 # internal
+import ccfilter
 from destretch_types import DestretchParams, DestretchLoopResult
 
 ## Processing: -----------------------------------------------------------------
@@ -557,13 +557,11 @@ def controlpoint_offsets_fft(
 	)
 
 	# apply fft to subwindows
-	# TODO parallelize with scipi?
 	ffts = fft.fft2(subwindows, axes=(1, 2), workers=-1) 
 	ffts *= ref_fft
 	ffts *= lowpass_filter[np.newaxis, :, :]
 
 	# find cross correlation from inverse fft
-	# TODO parallelize with scipi?
 	correlations = np.abs(fft.ifft2(ffts, axes=(1,2), workers=-1))
 	correlations = np.roll(correlations, (kernel_width // 2, kernel_height // 2), axis=(1, 2))
 
@@ -689,7 +687,8 @@ def reg(
 		apod_window, smou, destr_info
 	)
 	
-	# TODO filter correlations here
+	filter_weights = ccfilter.psr_filter_weights(correlations)
+	# TODO apply these filter weights to offsets somehow
 
 	ans = doreg(scene, rdisp, disp)
 
