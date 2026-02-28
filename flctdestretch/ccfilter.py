@@ -14,8 +14,17 @@ def get_psrs(
 	peak_coords: np.ndarray | None = None
 ) -> np.ndarray:
 	"""
-	calculate peak-to-sidelobe ratio for a set of correlations
+	Compute Peak-to-Sidelobe Ratio (PSR).
 
+	PSR = (peak - mean_sidelobe) / std_sidelobe
+	where sidelobes exclude a small window around the peak.
+	
+	Reference
+	---------
+	Savvides, M., & Kumar, B. V. K. V. (2004).
+    Face Verification Using Correlation Filters,
+    https://www.cis.rit.edu/~rlepci/Erho/Derek/Useful_References/Correlation%20Filtering/Savvides_COR_Face_app1.pdf
+	
 	Parameters:
 	----------
 	correlations : ndarray (count, kernel_width, kernel_height)
