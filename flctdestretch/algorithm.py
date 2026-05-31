@@ -318,9 +318,6 @@ def bilin_control_points(
 		for el in range(scene_nx)
 	]
 
-	# calculate offsets between displaced and reference positions
-	dd = disp - rdisp
-
 	interp_x = RectBivariateSpline(cp_x_coords, cp_y_coords, disp[0, :, :], kx=3, ky=3, s=0)
 	interp_y = RectBivariateSpline(cp_x_coords, cp_y_coords, disp[1, :, :], kx=3, ky=3, s=0)
 
