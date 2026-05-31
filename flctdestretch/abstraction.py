@@ -525,9 +525,9 @@ def calc_rolling_mean(
 
 			# calculate the average from scratch if it doesn't exist yet
 			if data_avg is None:
-				data_avg = original_data[local_marg_min]
+				data_avg = original_data[local_marg_min].copy()
 				for i1 in range(local_marg_min + 1, local_marg_max):
-					data_avg += original_data[i1].copy()
+					data_avg += original_data[i1]
 				data_avg /= margin_range
 			
 			# if it does exist, remove the preceding datas, and add the datas 
@@ -541,16 +541,7 @@ def calc_rolling_mean(
 				# adjust current avg weight to new range if changed
 				local_avg_end = data_avg_end - original_data_off
 				if data_avg_range != margin_range:
-					avg_weight_prev_numerator = data_avg_range - (
-						local_avg_start -
-						local_marg_min
-					)
-					avg_weight_numerator = margin_range - (
-						local_marg_max - 
-						local_avg_end
-					)
-					data_avg /= avg_weight_prev_numerator / data_avg_range
-					data_avg *= avg_weight_numerator
+					data_avg *= data_avg_range / margin_range
 
 				# add new datas to average
 				for i1 in range(local_avg_end, local_marg_max):
