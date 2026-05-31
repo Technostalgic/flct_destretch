@@ -239,7 +239,7 @@ def fits_file_process_iter(
 			doreg(
 				image_data, 
 				rdisp,
-				rdisp - corrected_off_data * 2
+				-corrected_off_data * 2
 			),
 			None,
 			None,
@@ -422,7 +422,7 @@ def calc_offset_vectors(
 		# use final displacement sum 'disp_sum' - 'rdisp_sum'
 		_, disp_sum, rdisp_sum, _ = result
 		assert disp_sum is not None
-		offsets = disp_sum - rdisp_sum
+		offsets = disp_sum
 
 		# output the vectors as a new fits file
 		out_num = f"{index:0{out_name_digits}}"

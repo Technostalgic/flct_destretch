@@ -28,7 +28,7 @@ files = files[0:10]
 print(f"{len(files)} files found")
 
 # variables for destretching config
-kernel_sizes: np.ndarray[np.int64] = np.array([128, 64, 32, 16])
+kernel_sizes: np.ndarray[np.int64] = np.array([128, 64, 32])
 rolling_mean_window_size: int = 3
 flowmap_window_size: int = 2
 

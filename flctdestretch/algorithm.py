@@ -321,8 +321,8 @@ def bilin_control_points(
 	# calculate offsets between displaced and reference positions
 	dd = disp - rdisp
 
-	interp_x = RectBivariateSpline(cp_x_coords, cp_y_coords, dd[0, :, :], kx=3, ky=3, s=0)
-	interp_y = RectBivariateSpline(cp_x_coords, cp_y_coords, dd[1, :, :], kx=3, ky=3, s=0)
+	interp_x = RectBivariateSpline(cp_x_coords, cp_y_coords, disp[0, :, :], kx=3, ky=3, s=0)
+	interp_y = RectBivariateSpline(cp_x_coords, cp_y_coords, disp[1, :, :], kx=3, ky=3, s=0)
 
 	xy_grid = np.zeros((2, scene_nx, scene_ny))
 
@@ -571,8 +571,8 @@ def controlpoint_offsets_fft(
 
 	# store peak coordinates
 	offsets = np.zeros((2, destr_info.cpx, destr_info.cpy), dtype=np.float32)
-	offsets[0].ravel()[:] = topleft_x + xmax
-	offsets[1].ravel()[:] = topleft_y + ymax
+	offsets[0].ravel()[:] = xmax - kernel_width // 2
+	offsets[1].ravel()[:] = ymax - kernel_height // 2
 
 	return offsets, correlations
 
@@ -618,7 +618,7 @@ def reg_loop(
 		# (i.e. the same number of pixels as the input image)
 		dispmap_new, offsets_new  = bilin_control_points(scene, rdisp, disp)
 		# add the displacement and offset maps to
-		displacement_sum += dispmap_new
+		displacement_sum += offsets_new
 		offsets_sum += offsets_new
 		rdisp_sum += dispmap_new - offsets_new
 		kernel_count += 1
