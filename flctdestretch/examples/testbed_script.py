@@ -39,14 +39,15 @@ flowmap_window_size: int = 2
 start_index: int = 0 
 
 # filepaths for output files
-out_off_dir = os.path.join(files_dir, "off")
-out_sum_dir = os.path.join(files_dir, "sum")
-out_off_control_dir = os.path.join(files_dir, "off_control")
-out_avg_dir = os.path.join(files_dir, "avg")
-out_flow_dir = os.path.join(files_dir, "flow")
-out_dir = os.path.join(files_dir, "destretched")
-out_dir_control = os.path.join(files_dir, "destretched_control")
-out_off_final_dir = os.path.join(files_dir, "off_final")
+output_dir = os.path.abspath(os.path.join(".", "flctdestretch", "examples", "out"))
+out_off_dir = os.path.join(output_dir, "off")
+out_sum_dir = os.path.join(output_dir, "sum")
+out_off_control_dir = os.path.join(output_dir, "off_control")
+out_avg_dir = os.path.join(output_dir, "avg")
+out_flow_dir = os.path.join(output_dir, "flow")
+out_dir = os.path.join(output_dir, "destretched")
+out_dir_control = os.path.join(output_dir, "destretched_control")
+out_off_final_dir = os.path.join(output_dir, "off_final")
 print(f"beginning destretch, end result will be output to {out_dir}")
 
 # begin timer
@@ -109,11 +110,11 @@ elapsed = time.time() - start
 print(f"Demo complete! \nTotal elapsed time: {elapsed}")
 
 # output video files
-out_file_orig_vid = os.path.join(files_dir, "video_original.mp4")
-out_file_destr_vid = os.path.join(files_dir, "video_destretched.mp4")
-out_file_flow_vid = os.path.join(files_dir, "video_flowmap.mp4")
-out_file_off_vid = os.path.join(files_dir, "video_offmap.mp4")
-out_file_off_final_vid = os.path.join(files_dir, "video_offmap_final.mp4")
+out_file_orig_vid = os.path.join(output_dir, "video_original.mp4")
+out_file_destr_vid = os.path.join(output_dir, "video_destretched.mp4")
+out_file_flow_vid = os.path.join(output_dir, "video_flowmap.mp4")
+out_file_off_vid = os.path.join(output_dir, "video_offmap.mp4")
+out_file_off_final_vid = os.path.join(output_dir, "video_offmap_final.mp4")
 
 # output results as video files
 scale = 4

@@ -13,5 +13,5 @@ dist/
 *~
 
 # large media folders
-large/
-*.mp4
+sample/
+out/
