@@ -29,7 +29,7 @@ def get_psrs(
 	---------
 	Savvides, M., & Kumar, B. V. K. V. (2004).
     Face Verification Using Correlation Filters,
-    https://www.cis.rit.edu/~rlepci/Erho/Derek/Useful_References/Correlation%20Filtering/Savvides_COR_Face_app1.pdf
+    http://mathdesc.fr/documents/facerecog/mace.pdf
 	"""
 	# mask_radius default is one eighth of the kernel size
 	if mask_radius is None:
