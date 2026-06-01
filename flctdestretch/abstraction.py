@@ -47,7 +47,7 @@ class IterProcessArgs(TypedDict):
 
 def fits_file_destretch_iter(
 		in_filepaths: list[str],
-		iter_func: Callable[[DestretchLoopResult], None],
+		iter_func: Callable[[DestretchLoopResult, np.ndarray], None],
 		** kwargs
 	) -> None:
 	"""
@@ -104,7 +104,7 @@ def fits_file_destretch_iter(
 
 		# perform image destretching
 		print(f"processing image #{i}.." + str(in_filepaths[i]))
-		result: DestretchLoopResult = reg_loop(
+		result, psrs = reg_loop(
 			image_data,
 			reference_image,
 			kernel_sizes,
@@ -150,7 +150,7 @@ def fits_file_destretch_iter(
 			)
 		
 		# call the function passed by caller
-		iter_func(result)
+		iter_func(result, psrs)
 
 def fits_file_process_iter(
 		in_data_files: list[str],
@@ -412,11 +412,14 @@ def calc_offset_vectors(
 	index: int = start_at
 
 	# ensure output directory exists
+	out_dir_psr = os.path.join(out_dir, "psrs")
 	if not os.path.exists(out_dir):
 		os.makedirs(out_dir)
+	if not os.path.exists(out_dir_psr):
+		os.makedirs(out_dir_psr)
 
 	# define the processing to calculate and store the offset files
-	def process_iter(result: DestretchLoopResult):
+	def process_iter(result: DestretchLoopResult, psrs: np.ndarray):
 		nonlocal index
 
 		# use final displacement sum 'disp_sum' - 'rdisp_sum'
@@ -427,7 +430,10 @@ def calc_offset_vectors(
 		# output the vectors as a new fits file
 		out_num = f"{index:0{out_name_digits}}"
 		out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
+		out_path_psr = os.path.join(out_dir_psr, out_filename + f"{out_num}.psr.fits")
 		fits.writeto(out_path, offsets, overwrite=True)
+		psr_width = int(round(psrs.shape[0] ** 0.5))
+		fits.writeto(out_path_psr, psrs.reshape((psr_width, psr_width)), overwrite=True)
 		out_paths.append(out_path)
 		index += 1
 	

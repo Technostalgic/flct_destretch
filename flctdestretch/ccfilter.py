@@ -36,25 +36,36 @@ def get_psrs(
 		mask_radius = min(min(correlations.shape[1:]) * 0.125, 2)
 	
 	# peak coordinates are recalcuated by default if not provided
-	count = correlations[0]
+	kwidth, kheight = correlations.shape[1], correlations.shape[2]
+	count = correlations.shape[0]
 	if peak_coords is None:
-		kernel_width = correlations[1]
-		peak_coords = np.zeros((count, 2))
+		peak_coords = np.zeros((count, 2), dtype=int)
 		coords = np.argmax(correlations.reshape(count, -1), axis=1)
-		peak_coords[:, 0] = coords % kernel_width
-		peak_coords[:, 1] = coords // kernel_width
+		peak_coords[:, 0] = coords % kwidth
+		peak_coords[:, 1] = coords // kwidth
 	
-	# create the masks for the sidelobe regions of the correlations
-	sidelobe_masks = np.ones(correlations.shape, dtype=np.bool)
-	# TODO mask out peak and surrounding radius
+	# create the masks for the sidelobe regions of the correlations:
+	# create homogenous coordinate grid for each correlation
+	gy, gx = np.meshgrid(np.arange(kheight), np.arange(kwidth), indexing='ij')
+	gx = gx[np.newaxis]
+	gy = gy[np.newaxis]
+
+	# broadcast peak positions into grid
+	px = peak_coords[:, 0, np.newaxis, np.newaxis]
+	py = peak_coords[:, 1, np.newaxis, np.newaxis]
+	dist_sq = (gx - px) ** 2 + (gy - py) ** 2
+
+	# get masks by distance check from broadcasted peak
+	sidelobe_masks = dist_sq > mask_radius ** 2
 
 	# apply sidelobe mask to separate correlation sidelobes from peak
-	sidelobe_means = np.mean(correlations, where=sidelobe_masks, axis=0)
-	sidelobe_stds = np.std(correlations, where=sidelobe_masks, axis=0)
+	masked_correlations = np.where(sidelobe_masks, correlations, np.nan)
+	sidelobe_means = np.nanmean(masked_correlations, axis=(1, 2))
+	sidelobe_stds = np.nanstd(masked_correlations, axis=(1, 2))
 	
 	# calculate psrs from the value at the correlation peak
 	indices = np.arange(count)
-	peak_vals = correlations[indices, peak_coords[1], peak_coords[2]]
+	peak_vals = correlations[indices, peak_coords[:, 0], peak_coords[:, 1]]
 	psrs = (peak_vals - sidelobe_means) / sidelobe_stds
 
 	return psrs

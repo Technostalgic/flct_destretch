@@ -13,6 +13,7 @@ from scipy.interpolate import RectBivariateSpline
 # internal
 import ccfilter
 from destretch_types import DestretchParams, DestretchLoopResult
+from ccfilter import get_psrs
 
 ## Processing: -----------------------------------------------------------------
 
@@ -563,6 +564,9 @@ def controlpoint_offsets_fft(
 	correlations = np.abs(fft.ifft2(ffts, axes=(1,2), workers=-1))
 	correlations = np.roll(correlations, (kernel_width // 2, kernel_height // 2), axis=(1, 2))
 
+	# TODO psr filter here
+	psrs = get_psrs(correlations)
+
 	# find peak for each correlation, with subpixel interpolation
 	xmax, ymax = correlation_maxpos_vectorized(correlations, destr_info.max_fit_method)
 
@@ -571,7 +575,7 @@ def controlpoint_offsets_fft(
 	offsets[0].ravel()[:] = xmax - kernel_width // 2
 	offsets[1].ravel()[:] = ymax - kernel_height // 2
 
-	return offsets, correlations
+	return offsets, correlations, psrs
 
 def reg_loop(
 	scene: np.ndarray, ref: np.ndarray, kernel_sizes: list[int], 
@@ -607,7 +611,7 @@ def reg_loop(
 
 	destr_info: DestretchParams | None = None
 	for kernel_dim in kernel_sizes:
-		scene_temp, disp, rdisp, correlations, destr_info = reg(
+		scene_temp, disp, rdisp, correlations, destr_info, psrs = reg(
 			scene_temp, ref, kernel_dim, 
 			mf, border_offset, spacing_ratio
 		)
@@ -635,7 +639,7 @@ def reg_loop(
 	# print(f"Total elapsed time {(end - start):.4f} seconds.")
 	ans = scene_temp
 
-	return DestretchLoopResult(ans, displacement_sum, rdisp_sum, destr_info)
+	return DestretchLoopResult(ans, displacement_sum, rdisp_sum, destr_info), psrs
 
 def reg(
 	scene: np.ndarray, ref: np.ndarray, kernel_size: int, 
@@ -680,7 +684,7 @@ def reg(
 	smou = smouth(destr_info.kx, destr_info.ky)
 
 	subfield_fftconj = doref(ref, apod_window, destr_info)
-	disp, correlations = controlpoint_offsets_fft(
+	disp, correlations, psrs = controlpoint_offsets_fft(
 		scene, subfield_fftconj, 
 		apod_window, smou, destr_info
 	)
@@ -690,7 +694,7 @@ def reg(
 
 	ans = doreg(scene, rdisp, disp)
 
-	return ans, disp, rdisp, correlations, destr_info
+	return ans, disp, rdisp, correlations, destr_info, psrs
 
 def doreg(
 	scene: np.ndarray, 
