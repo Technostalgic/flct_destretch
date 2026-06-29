@@ -47,7 +47,7 @@ class IterProcessArgs(TypedDict):
 
 def fits_file_destretch_iter(
 		in_filepaths: list[str],
-		iter_func: Callable[[DestretchLoopResult, np.ndarray], None],
+		iter_func: Callable[[DestretchLoopResult, list[np.ndarray]], None],
 		** kwargs
 	) -> None:
 	"""
@@ -104,24 +104,24 @@ def fits_file_destretch_iter(
 
 		# perform image destretching
 		print(f"processing image #{i}.." + str(in_filepaths[i]))
-		result, psrs = reg_loop(
+		result, displace_sum, ref_displace_sum, destr_info, psrs = reg_loop(
 			image_data,
 			reference_image,
 			kernel_sizes,
 			border_offset=border_offset,
 			spacing_ratio=spacing_ratio
 		)
-		assert result.displace_sum is not None
-		assert result.ref_displace_sum is not None
+		assert displace_sum is not None
+		assert ref_displace_sum is not None
 
 		# this introduces a non-insignificant computational overhead since we 
 		# need to iterate over every control point
 		if optimize_filesize:
 
 			# get control points
-			kernel = np.zeros((result.destr_info.kx, result.destr_info.ky))
+			kernel = np.zeros((destr_info.kx, destr_info.ky))
 			_, control_points = destr_control_points(
-				result.result, kernel,
+				result, kernel,
 				border_offset, spacing_ratio
 			)
 
@@ -137,20 +137,20 @@ def fits_file_destretch_iter(
 					# TODO verify the xy axes are not mixed up
 					x = int(control_points[0, x_index, y_index])
 					y = int(control_points[1, x_index, y_index])
-					result_reduced[x_index, y_index] = result.result[x, y]
-					disp_sum_reduced[:, x_index, y_index] = result.displace_sum[:, x,y]
-					ref_disp_sum_reduced[:, x_index, y_index] = result.ref_displace_sum[:, x,y]
+					result_reduced[x_index, y_index] = result[x, y]
+					disp_sum_reduced[:, x_index, y_index] = displace_sum[:, x,y]
+					ref_disp_sum_reduced[:, x_index, y_index] = ref_displace_sum[:, x,y]
 			
 			# apply reduced data to result
-			result = DestretchLoopResult(
+			new_result = DestretchLoopResult(
 				result_reduced, 
 				disp_sum_reduced, 
 				ref_disp_sum_reduced, 
-				result.destr_info
+				destr_info
 			)
 		
 		# call the function passed by caller
-		iter_func(result, psrs)
+		iter_func(new_result, psrs)
 
 def fits_file_process_iter(
 		in_data_files: list[str],
@@ -419,7 +419,7 @@ def calc_offset_vectors(
 		os.makedirs(out_dir_psr)
 
 	# define the processing to calculate and store the offset files
-	def process_iter(result: DestretchLoopResult, psrs: np.ndarray):
+	def process_iter(result: DestretchLoopResult, psrs: list[np.ndarray]):
 		nonlocal index
 
 		# use final displacement sum 'disp_sum' - 'rdisp_sum'
@@ -432,8 +432,17 @@ def calc_offset_vectors(
 		out_path = os.path.join(out_dir, out_filename + f"{out_num}.off.fits")
 		out_path_psr = os.path.join(out_dir_psr, out_filename + f"{out_num}.psr.fits")
 		fits.writeto(out_path, offsets, overwrite=True)
-		psr_width = int(round(psrs.shape[0] ** 0.5))
-		fits.writeto(out_path_psr, psrs.reshape((psr_width, psr_width)), overwrite=True)
+
+		hdus: list[fits.PrimaryHDU | fits.ImageHDU] = []
+		for psr in psrs:
+			# reshape from 1d to 2d, using sqrt as square width
+			psr_width = int(round(psr.shape[0] ** 0.5))
+			if len(hdus) <= 0:
+				hdus.append(fits.PrimaryHDU(psr.reshape((psr_width, psr_width))))
+			else: 
+				hdus.append(fits.ImageHDU(psr.reshape((psr_width, psr_width))))
+		fits.HDUList([*hdus]).writeto(out_path_psr, overwrite=True)
+
 		out_paths.append(out_path)
 		index += 1
 	

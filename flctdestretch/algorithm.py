@@ -495,7 +495,7 @@ def controlpoint_offsets_fft(
 	apod_window: np.ndarray, 
 	lowpass_filter: np.ndarray, 
 	destr_info: DestretchParams
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 	"""
 	Calculate the offsets of the control points in the reference frame, which 
 	can be determined from the subfield fft cojugates passed in here
@@ -581,7 +581,7 @@ def reg_loop(
 	scene: np.ndarray, ref: np.ndarray, kernel_sizes: list[int], 
 	mf: float = 0.08, border_offset: int = 4, 
 	spacing_ratio: float = 0.5
-) -> DestretchLoopResult:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, DestretchParams, list[np.ndarray]]:
 	"""
 	Parameters
 	----------
@@ -610,11 +610,13 @@ def reg_loop(
 	kernel_count = 0
 
 	destr_info: DestretchParams | None = None
+	psrs_layers: list[np.ndarray] = []
 	for kernel_dim in kernel_sizes:
 		scene_temp, disp, rdisp, correlations, destr_info, psrs = reg(
 			scene_temp, ref, kernel_dim, 
 			mf, border_offset, spacing_ratio
 		)
+		psrs_layers.append(psrs)
 		# remap displacements onto spatial grid of scene 
 		# (i.e. the same number of pixels as the input image)
 		dispmap_new, offsets_new  = bilin_control_points(scene, rdisp, disp)
@@ -637,9 +639,9 @@ def reg_loop(
 
 	# end = time.time()
 	# print(f"Total elapsed time {(end - start):.4f} seconds.")
-	ans = scene_temp
+	result = scene_temp
 
-	return DestretchLoopResult(ans, displacement_sum, rdisp_sum, destr_info), psrs
+	return result, displacement_sum, rdisp_sum, destr_info, psrs_layers
 
 def reg(
 	scene: np.ndarray, ref: np.ndarray, kernel_size: int, 
